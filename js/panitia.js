@@ -1,0 +1,1124 @@
+/* =========================================================
+   LMS BAT — Halaman Panitia (menu menyesuaikan peran)
+   Dashboard · Pelajar · Manajemen Kelas (Kelompok Kelas, Mata Pelajaran) · Jadwal ·
+   Materi & Tugas · Presensi · Perizinan · Laporan · Pengguna & Peran · Pengaturan
+   ========================================================= */
+const PanitiaPages = {};
+
+/* Pengajuan izin yang menunggu tindakan saya */
+function myLeaveActions() {
+  const out = [];
+  if (App.has('wali')) { const w = Q.waliGroupIds(); out.push(...DB.leaves.filter(l => l.status === 'wali' && w.includes(Q.session(l.sessionId).groupId))); }
+  if (App.has('kurikulum')) out.push(...DB.leaves.filter(l => l.status === 'kurikulum'));
+  return out;
+}
+function scopeLeaves() {
+  if (Q.seeAll()) return DB.leaves;
+  const w = Q.waliGroupIds();
+  return DB.leaves.filter(l => w.includes(Q.session(l.sessionId).groupId));
+}
+const roleBadges = u => u.roles.map(r => badge(DB.roles[r], r === 'admin' ? 'danger' : r === 'ketua' ? 'accent' : 'primary', 'no-dot')).join('');
+
+/* ---------- Dashboard ---------- */
+PanitiaPages.dashboard = {
+  title: 'Dashboard',
+  render() {
+    const u = App.user;
+    const groups = Q.myGroups();
+    const students = Q.scopeStudents();
+    const scopeSess = Q.scopeSessions();
+    const todays = scopeSess.filter(s => s.date === todayStr());
+    const weekPast = scopeSess.filter(s => dayDiff(s.date) >= -7 && dayDiff(s.date) < 0);
+    const weekPct = weekPast.length ? avg(weekPast.map(s => sessionRecap(s).pct)) : 0;
+    const leaveAct = myLeaveActions();
+    const toGrade = App.has('tutor', 'kurikulum') ? Q.myAssignments().filter(a => a.submitted > a.graded) : [];
+    const corr = App.has('tutor', 'kurikulum') ? DB.corrections.filter(k => k.status === 'pending' && Q.canRunSession(Q.session(k.sessionId))) : [];
+    const pendingAll = DB.leaves.filter(l => ['wali', 'kurikulum'].includes(l.status)).length;
+    const last7 = scopeSess.filter(s => s.date < todayStr()).slice(-7);
+    const monitorOnly = App.has('ketua') && !App.has('kurikulum', 'wali');
+
+    const actions = [
+      ...leaveAct.map(l => { const st = Q.student(l.studentId); return { ic: 'clipboard', tone: 'var(--warning)', title: `${l.status === 'wali' ? 'Verifikasi' : 'Putuskan'} izin ${st.name}`, sub: `${l.reason} · ${Q.grp(st.groupId).name}`, go: 'perizinan', b: badge(l.status === 'wali' ? 'Wali Kelas' : 'Kurikulum', l.status === 'wali' ? 'warning' : 'info') }; }),
+      ...toGrade.map(a => ({ ic: 'file', tone: 'var(--primary)', title: `Nilai ${a.submitted - a.graded} pengumpulan`, sub: `${a.title} · ${Q.subj(a.subjectId).code}`, go: 'materi/' + a.subjectId, b: badge('Penilaian', 'primary') })),
+      ...corr.map(k => ({ ic: 'qr', tone: 'var(--info)', title: `Koreksi presensi ${Q.student(k.studentId).name}`, sub: `${k.type} · ${fmtDay(Q.session(k.sessionId).date)}`, go: 'presensi', b: badge('Koreksi', 'info') })),
+    ];
+
+    return `
+    <div class="page-head">
+      <div><p class="eyebrow">${fmtLong(todayStr())}</p><h1>${greeting()}, ${esc(firstName(u.name))}!</h1>
+        <div class="role-chips" style="margin-top:8px">${roleBadges(u)}</div></div>
+      ${App.has('kurikulum', 'tutor', 'wali') ? `<div class="actions"><button class="btn btn-ghost" data-ann>${icon('megaphone', 16)} Pengumuman</button>${todays.some(Q.canRunSession) ? `<a class="btn btn-primary" href="#/presensi">${icon('qr', 16)} Buka presensi</a>` : ''}</div>` : ''}
+    </div>
+    ${App.isAdmin ? `<div class="alert alert-primary" style="margin-bottom:16px">${icon('key', 16)}<span>Masuk sebagai <b>Administrator</b>: akses penuh ke seluruh modul, termasuk penempatan pelajar, tutor, Wali Kelas, serta menu <a href="#/pengguna" style="text-decoration:underline">Pengguna & Peran</a>.</span></div>` : ''}
+    <div class="stats">
+      ${statCard('users', students.length, Q.seeAll() ? 'Pelajar aktif' : 'Pelajar di kelompokku', 'primary', `${students.filter(s => s.status === 'Gap Year').length} alumni / gap year`)}
+      ${statCard('layers', groups.length, 'Kelompok Kelas', 'info', `${todays.length} sesi hari ini`)}
+      ${statCard('checkCircle', weekPct + '%', 'Kehadiran 7 hari', 'success', `${weekPast.length} sesi berjalan`)}
+      ${statCard('clipboard', monitorOnly ? pendingAll : leaveAct.length, monitorOnly ? 'Izin dalam proses' : 'Izin menunggu saya', 'warning', monitorOnly ? 'Mode pantau' : 'Butuh tindakan')}
+    </div>
+    <div class="cols cols-3-2">
+      <div class="card">
+        <div class="card-head"><h3>${icon('calendar', 16)} ${App.has('tutor') && !Q.seeAll() ? 'Sesi saya hari ini' : 'Jadwal hari ini'}</h3><a class="link" href="#/jadwal">Kalender ${icon('right', 14)}</a></div>
+        <div class="agenda">
+          ${todays.length ? todays.map(s => {
+            const g = Q.grp(s.groupId), sb = Q.subj(s.subjectId), st = Q.state(s), r = sessionRecap(s);
+            return `<div class="agenda-item" style="--c:${sb.color}"><div class="agenda-time"><b>${s.start}</b><span>${s.end}</span></div>
+              <div class="agenda-card"><div class="agenda-top">${stag(sb)}${tag(g)}${badge(st.label, st.tone)}</div><h4>${esc(s.topic)}</h4>
+              <div class="meta-row"><span>${icon('pin', 14)} ${esc(s.location)}</span><span>${icon('user', 14)} ${esc(s.tutor)}</span><span>${icon('users', 14)} ${r.total} pelajar</span></div>
+              ${Q.canRunSession(s) && st.key !== 'selesai' ? `<div class="agenda-actions"><a class="btn btn-sm btn-primary" href="#/presensi">${icon('qr', 14)} Buka sesi presensi</a></div>` : ''}</div></div>`;
+          }).join('') : emptyState('calendar', 'Tidak ada sesi hari ini', 'Nikmati harimu! Cek kalender untuk jadwal berikutnya.')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>${icon('bell', 16)} Menunggu tindakan saya</h3>${actions.length ? badge(actions.length, 'danger', 'no-dot') : ''}</div>
+        <div class="list">
+          ${actions.length ? actions.slice(0, 7).map(a => `<a class="item clickable" href="#/${a.go}"><div class="item-ic" style="--c:${a.tone}">${icon(a.ic, 18)}</div><div class="item-body"><div class="item-title">${esc(a.title)}</div><div class="item-sub">${esc(a.sub)}</div></div>${a.b}</a>`).join('')
+          : emptyState('checkCircle', monitorOnly ? 'Mode pantau' : 'Semua beres!', monitorOnly ? 'Ketua BAT memantau tanpa masuk alur persetujuan rutin.' : 'Tidak ada tindakan yang menunggu.')}
+        </div>
+      </div>
+    </div>
+    <div class="cols cols-3-2">
+      <div class="card">
+        <div class="card-head"><h3>${icon('chart', 16)} Kehadiran 7 sesi terakhir</h3>${badge('Hadir + terlambat', 'neutral', 'no-dot')}</div>
+        ${last7.length ? barChart(last7.map(s => ({ label: `${fmtDate(s.date, { day: 'numeric', month: 'numeric' })} ${Q.subj(s.subjectId).code}`, value: sessionRecap(s).pct, color: Q.subj(s.subjectId).color })), { max: 100, suffix: '%' }) : emptyState('chart', 'Belum ada data')}
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>${icon('activity', 16)} Aktivitas terbaru</h3></div>
+        ${DB.activity.slice(0, 6).map(a => `<div class="activity">${avatar(a.who, 'sm')}<div><p><b>${esc(a.who)}</b> ${a.what} <b>${esc(a.obj)}</b></p><time>${relStamp(a.at)}</time></div></div>`).join('')}
+      </div>
+    </div>`;
+  },
+  mount(root) {
+    root.addEventListener('click', e => { if (e.target.closest('[data-ann]')) Shared.announceModal(null); });
+  },
+};
+
+/* ---------- Manajemen Pelajar ---------- */
+const PelajarMgmt = { q: '', grp: 'all' };
+PanitiaPages.pelajar = {
+  title: 'Manajemen Pelajar',
+  render() {
+    const groups = Q.myGroups();
+    const canPlace = Q.canPlace();
+    const all = Q.scopeStudents();
+    const scope = Q.seeAll() ? 'Seluruh pelajar BAT' : 'Pelajar di Kelompok Kelas yang kamu dampingi';
+    return `
+    <div class="page-head">
+      <div><h1>Manajemen Pelajar</h1><p>${scope}. Setiap pelajar terdaftar di tepat satu Kelompok Kelas.</p></div>
+      <div class="actions"><button class="btn btn-ghost" data-export>${icon('download', 16)} Ekspor</button>${canPlace ? `<button class="btn btn-primary" data-add>${icon('plus', 16)} Tambah pelajar</button>` : ''}</div>
+    </div>
+    ${!canPlace ? `<div class="alert alert-primary" style="margin-bottom:16px">${icon('shield', 16)}<span>Penempatan pelajar ke Kelompok Kelas hanya dapat diubah oleh Kurikulum atau Administrator.</span></div>` : ''}
+    <div class="stats">
+      ${statCard('users', all.length, 'Total pelajar', 'primary')}
+      ${statCard('book', all.filter(s => s.status === 'Kelas 12').length, 'Kelas 12', 'info')}
+      ${statCard('flag', all.filter(s => s.status === 'Gap Year').length, 'Alumni / gap year', 'accent')}
+      ${statCard('alert', all.filter(s => Q.attStats(s.id).pct < 80).length, 'Kehadiran < 80%', 'danger')}
+    </div>
+    <div class="card">
+      <div class="toolbar">
+        <div class="search">${icon('search', 16)}<input class="input" id="pm-q" placeholder="Cari nama atau sekolah…" value="${esc(PelajarMgmt.q)}"></div>
+        <select id="pm-grp" aria-label="Filter Kelompok Kelas"><option value="all">Semua Kelompok Kelas</option>${groups.map(g => `<option value="${g.id}" ${PelajarMgmt.grp === g.id ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>Pelajar</th><th>Kelompok Kelas</th><th>Wali Kelas</th><th>Asal / status</th><th style="width:160px">Kehadiran</th><th>Nilai</th><th></th></tr></thead><tbody id="pm-body">${this.rows()}</tbody></table></div>
+    </div>`;
+  },
+  rows() {
+    const q = PelajarMgmt.q.toLowerCase(), canPlace = Q.canPlace();
+    const list = Q.scopeStudents().filter(s => (PelajarMgmt.grp === 'all' || s.groupId === PelajarMgmt.grp) && (s.name.toLowerCase().includes(q) || s.school.toLowerCase().includes(q)));
+    if (!list.length) return `<tr><td colspan="7">${emptyState('users', 'Pelajar tidak ditemukan', 'Coba kata kunci atau filter lain.')}</td></tr>`;
+    return list.map(s => {
+      const pct = Q.attStats(s.id).pct, g = Q.grp(s.groupId);
+      return `<tr><td><div class="cell-user">${avatar(s.name, 'sm')}<div><b>${esc(s.name)}</b><small>${esc(s.email)}</small></div></div></td>
+        <td>${tag(g)}</td>
+        <td>${esc(g.wali)}</td>
+        <td>${esc(s.school)}<div class="muted small">${s.status}</div></td>
+        <td>${progRow(pct, toneByPct(pct))}</td>
+        <td><b>${Q.taskAvg(s.id)}</b></td>
+        <td style="text-align:right;white-space:nowrap"><button class="btn btn-sm btn-ghost" data-detail="${s.id}">Detail</button>${canPlace ? ` <button class="btn btn-sm btn-ghost" data-edit="${s.id}" aria-label="Ubah ${esc(s.name)}">${icon('edit', 14)} Ubah</button> <button class="icon-btn" data-move="${s.id}" title="Pindahkan kelompok" aria-label="Pindahkan ${esc(s.name)}">${icon('swap', 16)}</button>` : ''}</td></tr>`;
+    }).join('');
+  },
+  mount(root) {
+    $('#pm-q', root).addEventListener('input', e => { PelajarMgmt.q = e.target.value; $('#pm-body', root).innerHTML = this.rows(); });
+    $('#pm-grp', root).addEventListener('change', e => { PelajarMgmt.grp = e.target.value; $('#pm-body', root).innerHTML = this.rows(); });
+    root.addEventListener('click', e => {
+      const d = e.target.closest('[data-detail]'); if (d) return studentDetailModal(d.dataset.detail);
+      const ed = e.target.closest('[data-edit]'); if (ed) return this.formModal(ed.dataset.edit);
+      const mv = e.target.closest('[data-move]'); if (mv) return Shared.moveStudentModal(mv.dataset.move);
+      if (e.target.closest('[data-export]')) return toast('Data pelajar diekspor ke spreadsheet (demo).', 'info');
+      if (e.target.closest('[data-add]')) return this.formModal(null);
+    });
+  },
+  formModal(id) {
+    const s = id ? Q.student(id) : null;
+    openModal({
+      title: s ? 'Ubah data pelajar' : 'Tambah pelajar', sub: s ? s.name : 'Akun pelajar baru menerima email undangan untuk mengatur kata sandi.',
+      body: `<div class="form-grid two">
+        <label class="field span-2"><span>Nama lengkap</span><input id="ap-name" value="${s ? esc(s.name) : ''}"><small class="field-err"></small></label>
+        <label class="field"><span>Email</span><input id="ap-email" type="email" placeholder="nama@email.com" value="${s ? esc(s.email) : ''}"><small class="field-err"></small></label>
+        <label class="field"><span>No. HP</span><input id="ap-phone" placeholder="08…" value="${s ? esc(s.phone) : ''}"></label>
+        <label class="field"><span>Asal sekolah</span><input id="ap-school" value="${s ? esc(s.school) : ''}"></label>
+        <label class="field"><span>Status</span><select id="ap-status">${['Kelas 12', 'Gap Year'].map(v => `<option ${s && s.status === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+        <label class="field span-2"><span>Kelompok Kelas</span><select id="ap-grp">${DB.groups.map(g => `<option value="${g.id}" ${s && s.groupId === g.id ? 'selected' : ''}>${esc(g.name)} — Wali: ${esc(g.wali)} · ${Q.studentsOf(g.id).length} pelajar</option>`).join('')}</select></label>
+      </div>
+      <div class="note primary" id="ap-note">${icon('alert', 15)}<span>Satu pelajar hanya dapat terdaftar di satu Kelompok Kelas.</span></div>`,
+      footer: `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="ap-save">${icon('check', 16)} Simpan pelajar</button>`,
+      onMount(m) {
+        if (s) $('#ap-grp', m).addEventListener('change', e => {
+          $('#ap-note span', m).innerHTML = e.target.value === s.groupId ? 'Satu pelajar hanya dapat terdaftar di satu Kelompok Kelas.' : `Pelajar akan <b>dipindahkan</b> dari ${esc(Q.grp(s.groupId).name)} ke ${esc(Q.grp(e.target.value).name)}.`;
+        });
+        $('#ap-save', m).addEventListener('click', () => {
+          const name = $('#ap-name', m).value.trim(), email = $('#ap-email', m).value.trim();
+          fieldErr($('#ap-name', m), name ? '' : 'Nama wajib diisi.');
+          fieldErr($('#ap-email', m), /^\S+@\S+\.\S+$/.test(email) ? '' : 'Format email tidak valid.');
+          if (!name || !/^\S+@\S+\.\S+$/.test(email)) return;
+          const data = { name, email, phone: $('#ap-phone', m).value || '-', school: $('#ap-school', m).value || '-', status: $('#ap-status', m).value, groupId: $('#ap-grp', m).value };
+          if (s) {
+            const moved = s.groupId !== data.groupId, from = Q.grp(s.groupId).name;
+            Object.assign(s, data);
+            if (moved) DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Memindahkan ${name}: ${from} → ${Q.grp(data.groupId).name}` });
+            closeModal(); toast(moved ? `Data disimpan & ${esc(name)} dipindah ke ${esc(Q.grp(data.groupId).name)}.` : 'Data pelajar diperbarui.');
+          } else {
+            DB.students.push({ id: 'p' + Date.now(), ...data, joined: todayStr(), att: 100, avg: 0, toHist: [0, 0, 0, 0] });
+            closeModal(); toast(`${esc(name)} ditambahkan ke ${esc(Q.grp(data.groupId).name)} & undangan dikirim.`);
+          }
+          App.refresh();
+        });
+      },
+    });
+  },
+};
+
+function studentDetailModal(id) {
+  const s = Q.student(id), g = Q.grp(s.groupId);
+  const st = Q.attStats(s.id);
+  const hist = s.id === 'p1' ? DB.tryouts.map(Q.toAvg) : s.toHist;
+  const leaves = DB.leaves.filter(l => l.studentId === s.id);
+  openModal({
+    title: s.name, sub: `${s.school} · ${s.status}`, size: 'lg',
+    body: `
+      <div class="stats">
+        ${statCard('checkCircle', st.pct + '%', 'Kehadiran', 'success')}
+        ${statCard('target', Q.taskAvg(s.id), 'Rata-rata tugas', 'primary')}
+        ${statCard('trending', hist[hist.length - 1], 'Tryout terakhir', 'accent')}
+        ${statCard('clipboard', leaves.length, 'Pengajuan izin', 'warning')}
+      </div>
+      <div class="cols cols-1-1" style="margin-top:0">
+        <div class="card" style="background:var(--surface-2)"><div class="card-head"><h3>Kehadiran</h3></div>${attSummary(st, 120)}</div>
+        <div class="card" style="background:var(--surface-2)"><div class="card-head"><h3>Tren tryout eksternal</h3></div>${lineChart(hist.map((v, i) => ({ label: 'TO #' + (i + 1), value: v })), { min: 400, max: 700, color: '#ffb547', steps: 3, h: 200 })}</div>
+      </div>
+      <div class="kv">
+        <div><span>Kelompok Kelas</span><b>${tag(g)}</b></div>
+        <div><span>Wali Kelas</span><b>${esc(g.wali)}</b></div>
+        <div><span>Kontak</span><b>${esc(s.email)} · ${esc(s.phone)}</b></div>
+        <div><span>Bergabung</span><b>${fmtDate(s.joined, { day: 'numeric', month: 'long', year: 'numeric' })}</b></div>
+      </div>`,
+    footer: `${Q.canPlace() ? `<button class="btn btn-ghost" id="sd-move">${icon('swap', 16)} Pindahkan kelompok</button>` : ''}${App.has('tutor', 'wali', 'kurikulum') ? `<button class="btn btn-ghost" id="sd-note">${icon('edit', 16)} Catatan evaluasi</button>` : ''}<button class="btn btn-primary" data-close>Tutup</button>`,
+    onMount(m) {
+      const mv = $('#sd-move', m); if (mv) mv.addEventListener('click', () => Shared.moveStudentModal(s.id));
+      const b = $('#sd-note', m);
+      if (b) b.addEventListener('click', () => {
+        openModal({
+          title: 'Catatan evaluasi', sub: s.name,
+          body: `<label class="field"><span>Catatan untuk pelajar</span><textarea id="ev-text" placeholder="Tulis catatan perkembangan dan saran…"></textarea></label>`,
+          footer: `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="ev-save">Simpan</button>`,
+          onMount(mm) {
+            $('#ev-save', mm).addEventListener('click', () => {
+              const t = $('#ev-text', mm).value.trim(); if (!t) return toast('Catatan masih kosong.', 'error');
+              if (s.id === 'p1') DB.notes.unshift({ by: App.user.name, role: App.user.roles.map(r => DB.roles[r]).join(' & '), date: todayStr(), text: t });
+              closeModal(); toast('Catatan evaluasi tersimpan & terlihat oleh pelajar.');
+            });
+          },
+        });
+      });
+    },
+  });
+}
+
+/* =========================================================
+   MANAJEMEN KELAS — sub-navigasi: Kelompok Kelas · Mata Pelajaran
+   ========================================================= */
+const kelasSubnav = active => `<nav class="tabs subnav" aria-label="Sub-menu Manajemen Kelas">
+  <a class="tab ${active === 'kelompok' ? 'active' : ''}" href="#/kelas">${icon('layers', 16)} Kelompok Kelas</a>
+  <a class="tab ${active === 'mapel' ? 'active' : ''}" href="#/kelas/mapel">${icon('book', 16)} Mata Pelajaran</a>
+</nav>`;
+
+PanitiaPages.kelas = {
+  title: a => a === 'mapel' ? 'Mata Pelajaran' : a ? (Q.grp(a) ? Q.grp(a).name : 'Kelompok Kelas') : 'Kelompok Kelas',
+  crumb: () => 'Manajemen Kelas',
+  render(a) {
+    if (a === 'mapel') return kelasSubnav('mapel') + MapelPage.render();
+    if (a) {
+      if (TabMemory._grp !== a) { TabMemory._grp = a; delete TabMemory.grp; }
+      return kelasSubnav('kelompok') + Shared.groupDetail(a, true);
+    }
+    return kelasSubnav('kelompok') + KelompokPage.render();
+  },
+  mount(root, a) {
+    if (a === 'mapel') return MapelPage.mount(root);
+    Shared.bindGroupActions(root);
+  },
+};
+
+/* ---------- 3.1 Kelompok Kelas ---------- */
+const KelompokPage = {
+  render() {
+    const groups = Q.myGroups(), canPlace = Q.canPlace();
+    const allSt = Q.studentsIn(groups.map(g => g.id));
+    const weekN = Q.sessionsOf(groups.map(g => g.id)).filter(s => dayDiff(s.date) >= 0 && dayDiff(s.date) < 7).length;
+    const walis = Q.walis();
+    return `
+    <div class="page-head">
+      <div><h1>Kelompok Kelas</h1><p>${Q.seeAll() ? 'Seluruh Kelompok Kelas BAT beserta Wali Kelas, mata pelajaran, dan jadwalnya.' : 'Kelompok Kelas yang kamu ajar atau dampingi.'}</p></div>
+      ${canPlace ? `<div class="actions"><button class="btn btn-primary" data-act="new-group">${icon('plus', 16)} Tambah Kelompok Kelas</button></div>` : ''}
+    </div>
+    <div class="rule-strip">
+      <span>${icon('users', 14)} 1 pelajar = 1 Kelompok Kelas</span>
+      <span>${icon('user', 14)} 1 kelompok = 1 Wali Kelas</span>
+      <span>${icon('layers', 14)} Wali Kelas boleh memegang beberapa kelompok</span>
+      <span>${icon('shield', 14)} Tutor tidak merangkap Wali Kelas</span>
+      <span>${icon('pin', 14)} Seluruh sesi luring</span>
+    </div>
+    <div class="stats">
+      ${statCard('layers', groups.length, 'Kelompok Kelas', 'primary')}
+      ${statCard('users', allSt.length, 'Pelajar', 'info')}
+      ${statCard('user', new Set(groups.map(g => g.wali)).size, 'Wali Kelas bertugas', 'accent')}
+      ${statCard('calendar', weekN, 'Sesi 7 hari ke depan', 'success')}
+    </div>
+    ${groups.length ? `<div class="grid-cards">${groups.map(g => {
+      const n = Q.studentsOf(g.id).length, next = Q.nextSession([g.id]), subs = Q.subjectsOfGroup(g.id);
+      const role = [Q.teachesGroup(g) ? 'Tutor' : '', g.wali === App.user.name ? 'Wali Kelas' : ''].filter(Boolean).join(' · ');
+      return `<a class="class-card" href="#/kelas/${g.id}" style="--c:${g.color}">
+        <div class="class-cover"><span class="badge no-dot">${esc(g.program)}</span><h3>${esc(g.name)}</h3><p>${esc(g.room)}</p></div>
+        <div class="class-body">
+          <div class="class-people"><div class="person">${avatar(g.wali, 'sm')}<div><small>Wali Kelas</small><b>${esc(g.wali)}</b></div></div></div>
+          <div class="row wrap" style="gap:6px">${subs.map(stag).join('') || '<span class="muted small">Belum ada mapel terjadwal</span>'}</div>
+          ${next ? `<div class="meta-row"><span>${icon('calendar', 14)} ${relDay(next.date)}, ${next.start}</span><span>${icon('book', 14)} ${esc(Q.subj(next.subjectId).code)} · ${esc(next.topic)}</span></div>` : ''}
+          ${role ? `<div>${badge('Peranmu: ' + role, 'primary', 'no-dot')}</div>` : ''}
+          <div class="class-foot"><span>${icon('users', 14)} ${n} pelajar</span><span>${icon('book', 14)} ${subs.length} mapel</span><span>${icon('pin', 14)} Luring</span></div>
+        </div>
+      </a>`;
+    }).join('')}</div>` : `<div class="card">${emptyState('layers', 'Belum ada Kelompok Kelas', 'Kelompok akan muncul setelah kamu ditugaskan oleh Kurikulum.')}</div>`}
+    ${Q.seeAll() ? `<div class="card mt">
+      <div class="card-head"><h3>${icon('user', 16)} Wali Kelas & kelompok yang dipegang</h3><span class="muted small">${walis.length} Wali Kelas</span></div>
+      <div class="list">${walis.map(w => { const gs = DB.groups.filter(g => g.wali === w.name); return `<div class="item">${avatar(w.name)}<div class="item-body"><div class="item-title">${esc(w.name)}</div><div class="item-sub">${gs.length ? `${gs.length} Kelompok Kelas` : 'Belum memegang kelompok'}</div></div><div class="item-side row wrap" style="gap:6px;justify-content:flex-end">${gs.map(tag).join('') || badge('Tersedia', 'success')}</div></div>`; }).join('')}</div>
+    </div>` : ''}`;
+  },
+};
+
+/* ---------- 3.2 Mata Pelajaran ---------- */
+const MapelState = { q: '', st: 'all' };
+const MapelPage = {
+  render() {
+    const canPlace = Q.canPlace();
+    const cnt = k => DB.subjects.filter(s => k === 'all' || (k === 'on' ? s.active : !s.active)).length;
+    return `
+    <div class="page-head">
+      <div><h1>Mata Pelajaran</h1><p>Daftar mata pelajaran BAT. Materi dan tugas dikelompokkan berdasarkan mata pelajaran; mapel nonaktif tidak dapat dipilih untuk sesi atau tugas baru.</p></div>
+      ${canPlace ? `<div class="actions"><button class="btn btn-primary" data-new-subj>${icon('plus', 16)} Tambah mapel</button></div>` : ''}
+    </div>
+    <div class="card">
+      <div class="toolbar">
+        <div class="search">${icon('search', 16)}<input class="input" id="mp-q" placeholder="Cari nama atau kode mapel…" value="${esc(MapelState.q)}"></div>
+        <div class="chips">${[['all', 'Semua'], ['on', 'Aktif'], ['off', 'Nonaktif']].map(([k, l]) => `<button class="chip ${MapelState.st === k ? 'active' : ''}" data-st="${k}">${l}<span class="cnt">${cnt(k)}</span></button>`).join('')}</div>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>Kode</th><th>Mata Pelajaran</th><th>Tutor pengampu</th><th>Kelompok Kelas</th><th>Status</th>${canPlace ? '<th></th>' : ''}</tr></thead><tbody id="mp-body">${this.rows()}</tbody></table></div>
+    </div>`;
+  },
+  rows() {
+    const canPlace = Q.canPlace(), q = MapelState.q.toLowerCase();
+    const list = DB.subjects.filter(s => (MapelState.st === 'all' || (MapelState.st === 'on' ? s.active : !s.active)) && (s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q)));
+    if (!list.length) return `<tr><td colspan="6">${emptyState('book', 'Mapel tidak ditemukan', 'Coba kata kunci atau filter lain.')}</td></tr>`;
+    return list.map(s => {
+      const tutors = Q.tutorsOfSubject(s.id), groups = Q.groupsOfSubject(s.id);
+      return `<tr class="${s.active ? '' : 'row-muted'}">
+        <td>${stag(s)}</td>
+        <td style="min-width:220px"><b>${esc(s.name)}</b><div class="muted small">${esc(s.desc)}</div></td>
+        <td>${tutors.length ? `<div class="avatar-stack">${tutors.slice(0, 3).map(t => avatar(t, 'xs')).join('')}</div><div class="muted small">${tutors.map(esc).join(', ')}</div>` : '<span class="muted small">—</span>'}</td>
+        <td><div class="row wrap" style="gap:4px">${groups.map(tag).join('') || '<span class="muted small">—</span>'}</div></td>
+        <td>${canPlace ? `<label class="switch" title="${s.active ? 'Nonaktifkan' : 'Aktifkan'}"><input type="checkbox" data-toggle-subj="${s.id}" ${s.active ? 'checked' : ''}><span></span></label> <span class="muted small" style="margin-left:6px">${s.active ? 'Aktif' : 'Nonaktif'}</span>` : badge(s.active ? 'Aktif' : 'Nonaktif', s.active ? 'success' : 'neutral')}</td>
+        ${canPlace ? `<td style="text-align:right"><button class="btn btn-sm btn-ghost" data-edit-subj="${s.id}">${icon('edit', 14)} Ubah</button></td>` : ''}
+      </tr>`;
+    }).join('');
+  },
+  mount(root) {
+    $('#mp-q', root).addEventListener('input', e => { MapelState.q = e.target.value; $('#mp-body', root).innerHTML = this.rows(); });
+    root.addEventListener('change', e => {
+      const t = e.target.closest('[data-toggle-subj]'); if (!t) return;
+      const s = Q.subj(t.dataset.toggleSubj);
+      s.active = t.checked;
+      const upcoming = DB.sessions.filter(x => x.subjectId === s.id && Q.isUpcoming(x)).length;
+      toast(s.active ? `${esc(s.code)} diaktifkan.` : `${esc(s.code)} dinonaktifkan${upcoming ? `. Catatan: masih ada ${upcoming} sesi mendatang` : ''}.`, s.active || !upcoming ? 'success' : 'warning');
+      App.refresh();
+    });
+    root.addEventListener('click', e => {
+      const st = e.target.closest('[data-st]'); if (st) { MapelState.st = st.dataset.st; return App.refresh(); }
+      const ed = e.target.closest('[data-edit-subj]'); if (ed) return this.form(ed.dataset.editSubj);
+      if (e.target.closest('[data-new-subj]')) return this.form(null);
+    });
+  },
+  form(id) {
+    const s = id ? Q.subj(id) : null;
+    const colors = ['#34d399', '#8b7bff', '#60a5fa', '#ffb547', '#f472b6', '#22d3ee', '#a3e635', '#fb923c'];
+    openModal({
+      title: s ? 'Ubah Mata Pelajaran' : 'Tambah Mata Pelajaran',
+      body: `<div class="form-grid two">
+        <label class="field span-2"><span>Nama mata pelajaran</span><input id="sf-name" value="${s ? esc(s.name) : ''}" placeholder="cth. Penalaran Umum"><small class="field-err"></small></label>
+        <label class="field"><span>Kode</span><input id="sf-code" value="${s ? esc(s.code) : ''}" placeholder="cth. PU" maxlength="6" style="text-transform:uppercase"><small class="field-err"></small></label>
+        <div class="field"><span>Status</span><div class="setting-row" style="padding:6px 0;border:0"><div><b id="sf-st-label">${!s || s.active ? 'Aktif' : 'Nonaktif'}</b><small>Mapel aktif dapat dijadwalkan</small></div><label class="switch"><input type="checkbox" id="sf-active" ${!s || s.active ? 'checked' : ''}><span></span></label></div></div>
+        <label class="field span-2"><span>Deskripsi singkat</span><textarea id="sf-desc" maxlength="160" placeholder="Cakupan materi secara singkat…" style="min-height:80px">${s ? esc(s.desc) : ''}</textarea><small class="muted small" style="text-align:right"><span id="sf-count">${s ? s.desc.length : 0}</span>/160</small></label>
+      </div>`,
+      footer: `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="sf-save">${icon('check', 16)} Simpan mapel</button>`,
+      onMount(m) {
+        $('#sf-desc', m).addEventListener('input', e => { $('#sf-count', m).textContent = e.target.value.length; });
+        $('#sf-active', m).addEventListener('change', e => { $('#sf-st-label', m).textContent = e.target.checked ? 'Aktif' : 'Nonaktif'; });
+        $('#sf-save', m).addEventListener('click', () => {
+          const name = $('#sf-name', m).value.trim(), code = $('#sf-code', m).value.trim().toUpperCase();
+          const dup = DB.subjects.some(x => x !== s && x.code === code);
+          fieldErr($('#sf-name', m), name ? '' : 'Nama wajib diisi.');
+          fieldErr($('#sf-code', m), !/^[A-Z0-9]{2,6}$/.test(code) ? 'Kode 2–6 huruf/angka.' : dup ? 'Kode sudah dipakai mapel lain.' : '');
+          if (!name || !/^[A-Z0-9]{2,6}$/.test(code) || dup) return;
+          const data = { name, code, desc: $('#sf-desc', m).value.trim() || '-', active: $('#sf-active', m).checked };
+          if (s) Object.assign(s, data);
+          else DB.subjects.push({ id: 'sb' + Date.now(), color: colors[DB.subjects.length % colors.length], topics: [], ...data });
+          closeModal(); toast(s ? 'Mata pelajaran diperbarui.' : `Mapel ${esc(code)} ditambahkan.`); App.refresh();
+        });
+      },
+    });
+  },
+};
+
+/* ---------- Manajemen Jadwal (bersama) ---------- */
+PanitiaPages.jadwal = Shared.jadwal(true);
+
+/* =========================================================
+   MATERI DAN TUGAS — dikelompokkan per Mata Pelajaran
+   ========================================================= */
+const MateriState = { grp: 'all' };
+function ensureSubs(a) {
+  const list = Q.studentsIn(a.groupIds);
+  if (a.subs && a.subs.length === list.length) return a.subs;
+  let k = 0;
+  a.subs = list.map(st => {
+    if (st.id === 'p1' && a.my) return { studentId: st.id, submitted: a.my.status !== 'belum', file: a.my.file, at: a.my.submittedAt, score: a.my.score, feedback: a.my.feedback };
+    const i = k++;
+    const submitted = i < a.submitted - (a.my && a.my.status !== 'belum' ? 1 : 0);
+    const graded = submitted && i < a.graded - (a.my && a.my.status === 'dinilai' ? 1 : 0);
+    const h = hashStr(st.id + a.id);
+    return { studentId: st.id, submitted, file: submitted ? `${firstName(st.name)}_${a.title.split(' ')[0]}.pdf` : null, at: submitted ? `${DB.D(Math.min(-1, dayDiff(a.deadline) - 1))} ${pad2(18 + h % 5)}:${pad2(h % 60)}` : null, score: graded ? 70 + h % 28 : null, feedback: graded ? 'Sudah baik, pertahankan.' : '' };
+  });
+  return a.subs;
+}
+const canManageMat = () => App.has('tutor', 'kurikulum');
+const matItem = (m, withDl = true) => `<div class="item"><div class="item-ic" style="--c:${MAT_COLOR[m.type]}">${icon(MAT_ICON[m.type], 18)}</div><div class="item-body"><div class="item-title">${esc(m.title)}</div><div class="item-sub">${m.type} · ${m.size} · ${esc(m.by)} · ${fmtShort(m.date)}</div></div>${withDl ? `<button class="icon-btn" data-dl="${esc(m.title)}" aria-label="Unduh">${icon(m.type === 'Link' ? 'link' : 'download', 18)}</button>` : ''}</div>`;
+
+PanitiaPages.materi = {
+  title: sid => sid && Q.subj(sid) ? Q.subj(sid).name : 'Materi dan Tugas',
+  render(sid) {
+    if (sid && TabMemory._mapel !== sid) { TabMemory._mapel = sid; delete TabMemory.mapel; }
+    return sid ? this.detail(sid) : this.overview();
+  },
+  overview() {
+    const asg = Q.myAssignments();
+    const subs = Q.mySubjects().filter(s => s.active || DB.materials.some(m => m.subjectId === s.id) || asg.some(a => a.subjectId === s.id));
+    const toGrade = asg.filter(a => a.submitted > a.graded);
+    const mats = DB.materials.filter(m => subs.some(s => s.id === m.subjectId));
+    return `
+    <div class="page-head">
+      <div><h1>Materi dan Tugas</h1><p>Dikelompokkan per Mata Pelajaran. Materi melekat pada mapel dan terbuka untuk semua Kelompok Kelas yang mempelajarinya; tugas dibuat per mapel lalu ditujukan ke satu atau beberapa Kelompok Kelas.</p></div>
+      ${canManageMat() ? `<div class="actions"><button class="btn btn-ghost" data-new-mat>${icon('upload', 16)} Unggah materi</button><button class="btn btn-primary" data-new-task>${icon('plus', 16)} Buat tugas</button></div>` : ''}
+    </div>
+    <div class="stats">
+      ${statCard('book', subs.length, 'Mata Pelajaran', 'primary')}
+      ${statCard('file', mats.length, 'Materi', 'info')}
+      ${statCard('clipboard', asg.filter(a => dayDiff(a.deadline) >= 0).length, 'Tugas aktif', 'accent')}
+      ${statCard('check', toGrade.reduce((n, a) => n + a.submitted - a.graded, 0), 'Perlu dinilai', 'warning')}
+    </div>
+    <div class="grid-cards">${subs.map(sb => {
+      const ms = DB.materials.filter(m => m.subjectId === sb.id), ts = asg.filter(a => a.subjectId === sb.id);
+      const need = ts.reduce((n, a) => n + a.submitted - a.graded, 0);
+      const gs = Q.groupsOfSubject(sb.id).filter(g => Q.seeAll() || Q.myGroupIds().includes(g.id));
+      return `<a class="class-card" href="#/materi/${sb.id}" style="--c:${sb.color}">
+        <div class="class-cover"><span class="badge no-dot">${esc(sb.code)}</span><h3>${esc(sb.name)}</h3><p>${esc(sb.desc)}</p></div>
+        <div class="class-body">
+          <div class="row wrap" style="gap:6px">${gs.map(tag).join('') || '<span class="muted small">Belum dijadwalkan di kelompok mana pun</span>'}</div>
+          <div class="row wrap" style="gap:6px">${need ? badge(`${need} perlu dinilai`, 'warning') : ''}${sb.active ? '' : badge('Mapel nonaktif', 'neutral')}</div>
+          <div class="class-foot"><span>${icon('file', 14)} ${ms.length} materi</span><span>${icon('clipboard', 14)} ${ts.length} tugas</span><span>${icon('user', 14)} ${Q.tutorsOfSubject(sb.id).length} tutor</span></div>
+        </div>
+      </a>`;
+    }).join('') || `<div class="card">${emptyState('book', 'Belum ada mata pelajaran', 'Mapel muncul setelah kamu dijadwalkan mengajar.')}</div>`}</div>
+    ${toGrade.length ? `<div class="card mt"><div class="card-head"><h3>${icon('check', 16)} Pengumpulan menunggu penilaian</h3></div><div class="list">
+      ${toGrade.map(a => `<button class="item clickable" data-grade="${a.id}" style="width:100%;text-align:left"><div class="item-ic" style="--c:${Q.subj(a.subjectId).color}">${icon('file', 18)}</div><div class="item-body"><div class="item-title">${esc(a.title)}</div><div class="item-sub">${esc(Q.subj(a.subjectId).code)} · ${a.groupIds.map(g => esc(Q.grp(g).name)).join(', ')}</div></div>${badge(`${a.submitted - a.graded} perlu dinilai`, 'warning')}</button>`).join('')}
+    </div></div>` : ''}`;
+  },
+  detail(sid) {
+    const sb = Q.subj(sid);
+    if (!sb || !Q.mySubjects().includes(sb)) return `<div class="card">${emptyState('book', 'Mata pelajaran tidak ditemukan', '', `<a class="btn btn-ghost" href="#/materi">Kembali</a>`)}</div>`;
+    const mats = DB.materials.filter(m => m.subjectId === sid).sort((a, b) => b.date.localeCompare(a.date));
+    const all = Q.myAssignments().filter(a => a.subjectId === sid);
+    const targetIds = [...new Set(all.flatMap(a => a.groupIds))];
+    if (MateriState.grp !== 'all' && !targetIds.includes(MateriState.grp)) MateriState.grp = 'all';
+    const tasks = all.filter(a => MateriState.grp === 'all' || a.groupIds.includes(MateriState.grp)).sort((a, b) => b.deadline.localeCompare(a.deadline));
+    const studying = Q.groupsOfSubject(sid);
+    return `
+    <div class="class-hero" style="--c:${sb.color}">
+      <a class="back" href="#/materi">${icon('left', 16)} Semua mata pelajaran</a>
+      <h1>${esc(sb.name)} <span class="muted" style="font-weight:700">· ${esc(sb.code)}</span></h1>
+      <p>${esc(sb.desc)}</p>
+      <div class="meta-row" style="margin-top:10px"><span>${icon('user', 14)} ${Q.tutorsOfSubject(sid).map(esc).join(', ') || '—'}</span><span>${icon('layers', 14)} Dipelajari: ${studying.map(g => esc(g.name)).join(', ') || '—'}</span></div>
+      ${canManageMat() && sb.active ? `<div class="hero-actions"><button class="btn btn-ghost" data-new-mat="${sid}">${icon('upload', 16)} Unggah materi</button><button class="btn btn-primary" data-new-task="${sid}">${icon('plus', 16)} Buat tugas</button></div>` : ''}
+    </div>
+    <div data-tab-scope>
+      <div class="tabs" data-tabs="mapel" style="max-width:max-content">
+        <button class="tab ${tabCls('mapel', 't', true)}" data-tab="t">${icon('clipboard', 16)} Tugas <span class="muted">${all.length}</span></button>
+        <button class="tab ${tabCls('mapel', 'm')}" data-tab="m">${icon('file', 16)} Materi <span class="muted">${mats.length}</span></button>
+      </div>
+      <div class="tab-pane ${tabCls('mapel', 't', true)}" data-pane="t">
+        ${targetIds.length > 1 ? `<div class="chips" style="margin-bottom:14px"><button class="chip ${MateriState.grp === 'all' ? 'active' : ''}" data-grp="all">Semua kelompok</button>${targetIds.map(id => `<button class="chip ${MateriState.grp === id ? 'active' : ''}" data-grp="${id}">${esc(Q.grp(id).name)}</button>`).join('')}</div>` : ''}
+        ${tasks.length ? tasks.map(a => {
+          const n = Q.assignTotal(a), need = a.submitted - a.graded, open = dayDiff(a.deadline) >= 0;
+          return `<div class="task">
+            <div class="task-main">
+              <div class="task-top"><span class="muted small" style="font-weight:700">Untuk:</span>${a.groupIds.map(g => tag(Q.grp(g))).join('')}${open ? badge('Aktif', 'success') : badge('Tenggat lewat', 'neutral')}${need > 0 ? badge(`${need} perlu dinilai`, 'warning') : ''}</div>
+              <h4>${esc(a.title)}</h4><p>${esc(a.desc)}</p>
+              <div class="meta-row"><span>${icon('clock', 14)} Tenggat ${fmtDay(a.deadline)}, ${a.time} (${relDay(a.deadline)})</span><span>${icon('user', 14)} ${esc(a.by)}</span></div>
+              <div class="row wrap" style="gap:18px;margin-top:12px">
+                <div style="flex:1;min-width:160px"><div class="row-between small muted" style="margin-bottom:4px"><span>Dikumpul</span><b>${a.submitted}/${n}</b></div>${progress(n ? Math.round(a.submitted / n * 100) : 0, 'var(--info)')}</div>
+                <div style="flex:1;min-width:160px"><div class="row-between small muted" style="margin-bottom:4px"><span>Dinilai</span><b>${a.graded}/${a.submitted}</b></div>${progress(a.submitted ? Math.round(a.graded / a.submitted * 100) : 0, 'var(--success)')}</div>
+              </div>
+            </div>
+            <div class="task-side">${canManageMat() ? `<button class="btn ${need > 0 ? 'btn-primary' : 'btn-ghost'} btn-sm" data-grade="${a.id}">${icon('check', 14)} Periksa${need > 0 ? ` (${need})` : ''}</button>` : `<button class="btn btn-ghost btn-sm" data-grade="${a.id}">${icon('eye', 14)} Lihat</button>`}</div>
+          </div>`;
+        }).join('') : `<div class="card">${emptyState('clipboard', 'Belum ada tugas', 'Buat tugas dan pilih Kelompok Kelas tujuan.')}</div>`}
+      </div>
+      <div class="tab-pane ${tabCls('mapel', 'm')}" data-pane="m">
+        <div class="card">
+          <div class="note info" style="margin:0 0 10px">${icon('layers', 15)}<span>Materi ${esc(sb.code)} dapat diakses oleh seluruh Kelompok Kelas yang mempelajarinya${studying.length ? `: <b>${studying.map(g => esc(g.name)).join(', ')}</b>` : ''}.</span></div>
+          <div class="list">${mats.map(m => matItem(m)).join('') || emptyState('file', 'Belum ada materi')}</div>
+        </div>
+      </div>
+    </div>`;
+  },
+  mount(root, sid) {
+    bindTabs(root);
+    root.addEventListener('click', e => {
+      const g = e.target.closest('[data-grp]'); if (g) { MateriState.grp = g.dataset.grp; return App.refresh(); }
+      const gr = e.target.closest('[data-grade]'); if (gr) return this.gradeModal(gr.dataset.grade);
+      const nt = e.target.closest('[data-new-task]'); if (nt) return this.taskModal(nt.dataset.newTask || sid);
+      const nm = e.target.closest('[data-new-mat]'); if (nm) return this.matModal(nm.dataset.newMat || sid);
+      const d = e.target.closest('[data-dl]'); if (d) toast(`Mengunduh “${d.dataset.dl}” (demo)`, 'info');
+    });
+  },
+  gradeModal(id) {
+    const a = DB.assignments.find(x => x.id === id), sb = Q.subj(a.subjectId);
+    const subs = ensureSubs(a);
+    const canGrade = canManageMat();
+    openModal({
+      title: 'Periksa pengumpulan', sub: `${sb.code} · ${a.title}`, size: 'lg',
+      body: `<div class="row wrap" style="gap:8px">${badge(`${subs.filter(s => s.submitted).length} dikumpul`, 'info')}${badge(`${subs.filter(s => s.score != null).length} dinilai`, 'success')}${badge(`${subs.filter(s => !s.submitted).length} belum mengumpulkan`, 'warning')}</div>
+        ${a.groupIds.map(gid => {
+          const g = Q.grp(gid), rows = subs.map((s, i) => ({ s, i })).filter(x => Q.student(x.s.studentId).groupId === gid);
+          return `<div class="grade-group"><div class="row-between" style="margin:14px 0 4px">${tag(g)}<span class="muted small">${rows.filter(x => x.s.submitted).length}/${rows.length} dikumpul</span></div>
+            ${rows.map(({ s, i }) => {
+              const st = Q.student(s.studentId);
+              return `<div class="grade-row">
+                <div class="cell-user">${avatar(st.name, 'sm')}<div><b>${esc(st.name)}</b><small>${s.submitted ? `Dikumpul ${fmtStamp(s.at)}` : 'Belum mengumpulkan'}</small>${s.submitted ? `<div style="margin-top:6px"><button class="file-chip" data-file="${esc(s.file)}">${icon('clip', 13)}<span>${esc(s.file)}</span></button></div>` : ''}</div></div>
+                ${s.submitted ? `<div class="inputs"><input type="number" min="0" max="100" placeholder="Nilai" data-score="${i}" value="${s.score ?? ''}" ${canGrade ? '' : 'disabled'}><input placeholder="Umpan balik singkat…" data-fb="${i}" value="${esc(s.feedback || '')}" ${canGrade ? '' : 'disabled'}></div>` : `<div>${badge('Menunggu pengumpulan', 'neutral')}</div>`}
+              </div>`;
+            }).join('') || '<p class="muted small">Belum ada anggota.</p>'}</div>`;
+        }).join('')}`,
+      footer: canGrade ? `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="gr-save">${icon('check', 16)} Simpan nilai</button>` : `<button class="btn btn-primary" data-close>Tutup</button>`,
+      onMount(m) {
+        m.addEventListener('click', e => { const f = e.target.closest('[data-file]'); if (f) toast(`Membuka ${f.dataset.file} (demo)`, 'info'); });
+        const save = $('#gr-save', m);
+        if (!save) return;
+        save.addEventListener('click', () => {
+          let bad = false;
+          $$('[data-score]', m).forEach(inp => {
+            const i = +inp.dataset.score, v = inp.value.trim();
+            inp.style.borderColor = '';
+            if (v === '') return;
+            const n = Number(v);
+            if (isNaN(n) || n < 0 || n > 100) { inp.style.borderColor = 'var(--danger)'; bad = true; return; }
+            subs[i].score = n; subs[i].feedback = $(`[data-fb="${i}"]`, m).value.trim();
+            if (subs[i].studentId === 'p1' && a.my) Object.assign(a.my, { status: 'dinilai', score: n, feedback: subs[i].feedback || 'Kerja bagus!' });
+          });
+          if (bad) return toast('Nilai harus di antara 0–100.', 'error');
+          a.graded = subs.filter(s => s.score != null).length;
+          DB.activity.unshift({ who: App.user.name, what: 'menilai pengumpulan', obj: a.title, at: stamp(), icon: 'check' });
+          closeModal(); toast('Nilai & umpan balik tersimpan. Pelajar mendapat notifikasi.'); App.refresh();
+        });
+      },
+    });
+  },
+  /* Kelompok tujuan yang boleh dipilih untuk mapel tertentu */
+  targetGroups(sid) {
+    if (App.has('kurikulum')) return DB.groups;
+    const mine = [...new Set(DB.sessions.filter(s => s.tutor === App.user.name && s.subjectId === sid).map(s => s.groupId))];
+    const ids = mine.length ? mine : Q.teachGroupIds();
+    return DB.groups.filter(g => ids.includes(g.id));
+  },
+  taskModal(presetSid) {
+    const subs = Q.mySubjects().filter(s => s.active);
+    if (!subs.length) return toast('Tidak ada mata pelajaran aktif yang kamu ampu.', 'error');
+    const sid0 = subs.find(s => s.id === presetSid) ? presetSid : subs[0].id;
+    const groupChecks = sid => {
+      const studying = Q.groupsOfSubject(sid).map(g => g.id);
+      const list = this.targetGroups(sid);
+      return list.map(g => `<label class="check-chip"><input type="checkbox" value="${g.id}" ${list.length === 1 ? 'checked' : ''}><span style="--c:${g.color}"><b>${esc(g.name)}</b><small>${Q.studentsOf(g.id).length} pelajar${studying.includes(g.id) ? ` · mempelajari ${esc(Q.subj(sid).code)}` : ''}</small></span></label>`).join('');
+    };
+    openModal({
+      title: 'Buat tugas', sub: 'Tugas milik satu Mata Pelajaran dan ditujukan ke satu atau beberapa Kelompok Kelas.', size: 'lg',
+      body: `<div class="form-grid two">
+        <label class="field span-2"><span>Mata Pelajaran</span><select id="nt-subj">${subs.map(s => `<option value="${s.id}" ${s.id === sid0 ? 'selected' : ''}>${esc(s.code)} · ${esc(s.name)}</option>`).join('')}</select></label>
+        <div class="field span-2"><span>Ditujukan ke Kelompok Kelas</span><div class="check-grid" id="nt-groups">${groupChecks(sid0)}</div><small class="field-err" id="nt-groups-err"></small></div>
+        <label class="field span-2"><span>Judul tugas</span><input id="nt-title" placeholder="cth. Latihan Soal Peluang"><small class="field-err"></small></label>
+        <label class="field span-2"><span>Instruksi</span><textarea id="nt-desc" placeholder="Jelaskan apa yang harus dikerjakan…"></textarea></label>
+        <label class="field"><span>Tanggal tenggat</span><input type="date" id="nt-date" value="${DB.D(7)}"></label>
+        <label class="field"><span>Jam tenggat</span><input type="time" id="nt-time" value="23:59"></label>
+        <div class="field span-2"><span>Lampiran soal (opsional)</span>${dropzone('nt-file')}</div>
+      </div>`,
+      footer: `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="nt-save">${icon('send', 16)} Terbitkan tugas</button>`,
+      onMount(m) {
+        bindDropzone($('#nt-file', m));
+        $('#nt-subj', m).addEventListener('change', e => { $('#nt-groups', m).innerHTML = groupChecks(e.target.value); });
+        $('#nt-save', m).addEventListener('click', () => {
+          const title = $('#nt-title', m).value.trim();
+          const groupIds = $$('#nt-groups input:checked', m).map(i => i.value);
+          fieldErr($('#nt-title', m), title ? '' : 'Judul wajib diisi.');
+          $('#nt-groups-err', m).textContent = groupIds.length ? '' : 'Pilih minimal satu Kelompok Kelas.';
+          $('#nt-groups-err', m).closest('.field').classList.toggle('invalid', !groupIds.length);
+          if (!title || !groupIds.length) return;
+          const subjectId = $('#nt-subj', m).value;
+          const t = { id: 'a' + Date.now(), subjectId, groupIds, by: App.user.name, title, desc: $('#nt-desc', m).value.trim() || '-', deadline: $('#nt-date', m).value, time: $('#nt-time', m).value, createdAt: todayStr(), submitted: 0, graded: 0 };
+          if (groupIds.includes(Q.student('p1').groupId)) {
+            t.my = { status: 'belum', score: null, file: null, submittedAt: null, feedback: '' };
+            DB.notifications.pelajar.unshift({ title: `Tugas baru: ${title}`, text: `${Q.subj(subjectId).code} · Tenggat ${fmtShort(t.deadline)}`, at: stamp(), unread: true, icon: 'file' });
+          }
+          DB.assignments.push(t);
+          DB.activity.unshift({ who: App.user.name, what: 'membuat tugas', obj: title, at: stamp(), icon: 'file' });
+          TabMemory.mapel = 't'; TabMemory._mapel = subjectId;
+          closeModal(); toast(`Tugas diterbitkan ke ${Q.studentsIn(groupIds).length} pelajar di ${groupIds.length} Kelompok Kelas.`);
+          location.hash = '#/materi/' + subjectId; App.refresh();
+        });
+      },
+    });
+  },
+  matModal(presetSid) {
+    const subs = Q.mySubjects().filter(s => s.active);
+    if (!subs.length) return toast('Tidak ada mata pelajaran aktif yang kamu ampu.', 'error');
+    const sid0 = subs.find(s => s.id === presetSid) ? presetSid : subs[0].id;
+    let file = null;
+    const reach = sid => { const gs = Q.groupsOfSubject(sid); return gs.length ? `Akan tersedia untuk: <b>${gs.map(g => esc(g.name)).join(', ')}</b>.` : 'Belum ada Kelompok Kelas yang mempelajari mapel ini.'; };
+    openModal({
+      title: 'Unggah materi', sub: 'Materi melekat pada Mata Pelajaran.',
+      body: `<label class="field"><span>Mata Pelajaran</span><select id="nm-subj">${subs.map(s => `<option value="${s.id}" ${s.id === sid0 ? 'selected' : ''}>${esc(s.code)} · ${esc(s.name)}</option>`).join('')}</select></label>
+        <div class="note info" style="margin:0">${icon('layers', 15)}<span id="nm-reach">${reach(sid0)}</span></div>
+        <label class="field"><span>Judul materi</span><input id="nm-title" placeholder="cth. Modul Peluang"><small class="field-err"></small></label>
+        <label class="field"><span>Jenis</span><select id="nm-type"><option>PDF</option><option>PPT</option><option>Video</option><option>Link</option></select></label>
+        <div class="field"><span>Berkas</span>${dropzone('nm-file', 'PDF, PPT, MP4 · atau tautan')}</div>`,
+      footer: `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="nm-save">${icon('upload', 16)} Unggah</button>`,
+      onMount(m) {
+        $('#nm-subj', m).addEventListener('change', e => { $('#nm-reach', m).innerHTML = reach(e.target.value); });
+        bindDropzone($('#nm-file', m), f => { file = f; if (!$('#nm-title', m).value) $('#nm-title', m).value = f.name.replace(/\.[^.]+$/, ''); });
+        $('#nm-save', m).addEventListener('click', () => {
+          const title = $('#nm-title', m).value.trim();
+          if (!title) return fieldErr($('#nm-title', m), 'Judul wajib diisi.');
+          const type = $('#nm-type', m).value, subjectId = $('#nm-subj', m).value;
+          DB.materials.push({ id: 'm' + Date.now(), subjectId, title, type, size: file ? `${(file.size / 1048576).toFixed(1)} MB` : type === 'Link' ? 'Tautan' : '—', date: todayStr(), by: App.user.name });
+          DB.activity.unshift({ who: App.user.name, what: 'mengunggah materi', obj: title, at: stamp(), icon: 'upload' });
+          TabMemory.mapel = 'm'; TabMemory._mapel = subjectId;
+          closeModal(); toast('Materi berhasil diunggah.'); location.hash = '#/materi/' + subjectId; App.refresh();
+        });
+      },
+    });
+  },
+};
+
+/* ---------- Presensi (generator QR + daftar hadir real-time) ---------- */
+const PresensiPan = { sessionId: null, open: false, attendees: [], code: '', tick: 0 };
+PanitiaPages.presensi = {
+  title: 'Presensi',
+  render() {
+    const scope = Q.scopeSessions();
+    let options = scope.filter(s => s.date === todayStr());
+    const demo = !options.length;
+    if (demo) options = scope.filter(Q.isUpcoming).slice(0, 3);
+    if (!PresensiPan.sessionId || !options.find(s => s.id === PresensiPan.sessionId)) { PresensiPan.sessionId = (options.find(Q.canRunSession) || options[0] || {}).id || null; PresensiPan.open = false; PresensiPan.attendees = []; }
+    const s = Q.session(PresensiPan.sessionId);
+    const corr = DB.corrections.filter(k => scope.includes(Q.session(k.sessionId)));
+
+    return `
+    <div class="page-head">
+      <div><h1>Presensi</h1><p>Buka sesi untuk menampilkan QR Code unik di ruang kelas. Pelajar memindai, sistem mencatat waktu dan menentukan status secara otomatis.</p></div>
+    </div>
+    ${!s ? `<div class="card">${emptyState('qr', 'Tidak ada sesi', 'Belum ada sesi yang bisa dibuka.')}</div>` : `
+    <div class="cols cols-1-1">
+      <div class="card fullscreen-qr" id="qr-card">
+        ${PresensiPan.open ? this.qrView(s) : `
+          <div class="card-head"><h3>${icon('qr', 16)} Buka sesi presensi</h3>${demo ? badge('Mode demo', 'accent', 'no-dot') : badge('Hari ini', 'accent', 'no-dot')}</div>
+          ${demo ? `<div class="note warning" style="margin:0 0 14px">${icon('alert', 15)}<span>Tidak ada sesi hari ini dalam cakupanmu. Sesi mendatang ditampilkan untuk keperluan demo.</span></div>` : ''}
+          <div class="session-pick">
+            ${options.map(x => { const g = Q.grp(x.groupId), sb = Q.subj(x.subjectId); return `<label class="pick ${x.id === s.id ? 'active' : ''}"><input type="radio" name="ps" value="${x.id}" ${x.id === s.id ? 'checked' : ''}><span class="pick-bar" style="--c:${sb.color}"></span><div class="pick-body"><b>${esc(sb.code)} · ${esc(x.topic)}</b><span>${esc(g.name)} · ${fmtDay(x.date)} · ${x.start}–${x.end} · ${esc(x.tutor)}</span></div></label>`; }).join('')}
+          </div>
+          <div class="kv" style="margin-bottom:16px">
+            <div><span>Kelompok Kelas</span><b>${esc(Q.grp(s.groupId).name)} · ${Q.studentsOf(s.groupId).length} pelajar</b></div>
+            <div><span>Batas tepat waktu</span><b>${DB.addMin(s.start, Q.grp(s.groupId).late)} WIB (${Q.grp(s.groupId).late} menit)</b></div>
+            <div><span>QR diperbarui setiap</span><b>${DB.settings.qrRefresh} detik</b></div>
+            <div><span>Tempat</span><b>${esc(s.location)}</b></div>
+          </div>
+          ${Q.canRunSession(s) ? `<button class="btn btn-primary btn-lg btn-block" data-open>${icon('qr', 18)} Buka sesi & tampilkan QR</button>` : `<div class="note info">${icon('eye', 15)}<span>Peranmu hanya dapat memantau presensi sesi ini. Sesi dibuka oleh tutor sesi atau Kurikulum.</span></div>`}
+        `}
+      </div>
+      <div class="card">${this.liveView(s)}</div>
+    </div>`}
+    <div class="cols cols-1-1">
+      <div class="card">
+        <div class="card-head"><h3>${icon('edit', 16)} Pengajuan koreksi presensi</h3>${badge(`${corr.filter(k => k.status === 'pending').length} menunggu`, 'warning')}</div>
+        ${corr.length ? corr.map(k => {
+          const st = Q.student(k.studentId), ss = Q.session(k.sessionId);
+          return `<div class="leave-card"><div class="leave-head"><div class="cell-user" style="min-width:0">${avatar(st.name, 'sm')}<div><b>${esc(st.name)}</b><small>${esc(Q.grp(ss.groupId).name)} · ${esc(Q.subj(ss.subjectId).code)} · ${fmtDay(ss.date)}</small></div></div>${k.status === 'pending' ? badge('Menunggu', 'warning') : k.status === 'approved' ? badge('Disetujui', 'success') : badge('Ditolak', 'danger')}</div>
+            <p class="leave-reason"><b>${esc(k.type)}</b> — ${esc(k.note)}</p>
+            ${k.status === 'pending' && Q.canRunSession(ss) ? `<div class="row wrap"><button class="btn btn-sm btn-success" data-kok="${k.id}">${icon('check', 14)} Setujui → Hadir</button><button class="btn btn-sm btn-danger" data-kno="${k.id}">${icon('x', 14)} Tolak</button></div>` : ''}
+          </div>`;
+        }).join('') : emptyState('checkCircle', 'Tidak ada pengajuan koreksi')}
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>${icon('shield', 16)} Audit trail</h3><span class="muted small">Siapa · kapan · apa yang diubah</span></div>
+        ${DB.audit.slice(0, 8).map(a => `<div class="activity">${avatar(a.who, 'xs')}<div><p><b>${esc(a.who)}</b> · ${esc(a.what)}</p><time>${relStamp(a.at)}</time></div></div>`).join('')}
+      </div>
+    </div>`;
+  },
+  qrView(s) {
+    const g = Q.grp(s.groupId), sb = Q.subj(s.subjectId);
+    return `
+      <div class="card-head"><h3><span class="live-dot"></span> Sesi presensi dibuka</h3><div class="row"><button class="icon-btn" data-full title="Layar penuh">${icon('expand', 18)}</button></div></div>
+      <div class="qr-stage">
+        <div>${tag(g)} ${stag(sb)} <b style="margin-left:6px">${esc(s.topic)}</b></div>
+        <div class="qr-frame"><canvas id="qr-canvas" aria-label="QR Code presensi"></canvas></div>
+        <div class="qr-code" id="qr-code">${PresensiPan.code}</div>
+        <div class="qr-timer"><span>QR diperbarui dalam <b id="qr-sec">${DB.settings.qrRefresh}</b> dtk</span><div class="progress thin"><span id="qr-bar" style="width:100%"></span></div></div>
+        <div class="row wrap" style="justify-content:center">
+          <button class="btn btn-ghost" data-refresh-qr>${icon('refresh', 16)} Perbarui QR</button>
+          <button class="btn btn-danger" data-close-sess>${icon('xCircle', 16)} Tutup sesi</button>
+        </div>
+      </div>`;
+  },
+  liveView(s) {
+    const all = Q.studentsOf(s.groupId);
+    const at = PresensiPan.attendees;
+    const h = at.filter(a => a.status === 'hadir').length, t = at.filter(a => a.status === 'terlambat').length;
+    const notYet = all.filter(st => !at.find(a => a.id === st.id));
+    return `
+      <div class="card-head"><h3>${icon('users', 16)} Daftar hadir ${PresensiPan.open ? '<span class="live-dot" style="margin-left:4px"></span>' : ''}</h3><span class="muted small">${PresensiPan.open ? 'Real-time' : 'Sesi belum dibuka'}</span></div>
+      <div class="live-stats"><div><b style="color:var(--success)" id="ls-h">${h}</b><span>Hadir</span></div><div><b style="color:var(--warning)" id="ls-t">${t}</b><span>Terlambat</span></div><div><b id="ls-n">${notYet.length}</b><span>Belum</span></div></div>
+      <div class="live-list list" id="live-list">
+        ${at.length ? at.slice().reverse().map(a => this.liveItem(a)).join('') : `<div id="live-empty">${emptyState('scan', PresensiPan.open ? 'Menunggu pelajar memindai…' : 'Belum ada yang presensi', PresensiPan.open ? 'Nama pelajar akan muncul otomatis di sini.' : 'Buka sesi untuk mulai menerima presensi.')}</div>`}
+      </div>
+      ${notYet.length && PresensiPan.open ? `<details style="margin-top:12px"><summary class="small" style="cursor:pointer;color:var(--primary);font-weight:700">Belum presensi (${notYet.length}) · tandai manual</summary>
+        <div class="list" style="margin-top:8px">${notYet.map(st => `<div class="item">${avatar(st.name, 'xs')}<div class="item-body"><div class="item-title">${esc(st.name)}</div></div><button class="btn btn-sm btn-ghost" data-manual="${st.id}">Tandai hadir</button></div>`).join('')}</div></details>` : ''}`;
+  },
+  liveItem(a) {
+    const st = Q.student(a.id);
+    return `<div class="item">${avatar(st.name, 'sm')}<div class="item-body"><div class="item-title">${esc(st.name)}</div><div class="item-sub">${a.time} WIB${a.manual ? ' · ditandai manual' : ' · via QR'}</div></div>${badge(ATT[a.status].label, ATT[a.status].tone)}</div>`;
+  },
+  newCode() { PresensiPan.code = 'BAT-' + Math.random().toString(36).slice(2, 6).toUpperCase() + '-' + Math.floor(Math.random() * 90 + 10); },
+  startLive(root) {
+    const s = Q.session(PresensiPan.sessionId);
+    const canvas = $('#qr-canvas', root);
+    const draw = () => { drawQR(canvas, PresensiPan.code + s.id); $('#qr-code', root).textContent = PresensiPan.code; };
+    draw();
+    let sec = DB.settings.qrRefresh;
+    const timer = setInterval(() => {
+      sec--;
+      if (sec <= 0) { sec = DB.settings.qrRefresh; this.newCode(); draw(); }
+      const el = $('#qr-sec', root); if (el) el.textContent = sec;
+      const bar = $('#qr-bar', root); if (bar) bar.style.width = (sec / DB.settings.qrRefresh * 100) + '%';
+    }, 1000);
+    const all = Q.studentsOf(s.groupId);
+    const sim = () => {
+      const left = all.filter(st => !PresensiPan.attendees.find(a => a.id === st.id));
+      if (left.length <= 1) return;
+      const st = left[Math.floor(Math.random() * left.length)];
+      const late = PresensiPan.attendees.length > all.length * 0.65 && Math.random() < 0.6;
+      this.addAttendee(root, { id: st.id, time: nowHM(), status: late ? 'terlambat' : 'hadir' });
+      simT = setTimeout(sim, 1800 + Math.random() * 2600);
+    };
+    let simT = setTimeout(sim, 1500);
+    Cleanup.add(() => { clearInterval(timer); clearTimeout(simT); });
+  },
+  addAttendee(root, a) {
+    PresensiPan.attendees.push(a);
+    const list = $('#live-list', root);
+    const empty = $('#live-empty', root); if (empty) empty.remove();
+    list.insertAdjacentHTML('afterbegin', this.liveItem(a));
+    const at = PresensiPan.attendees, all = Q.studentsOf(Q.session(PresensiPan.sessionId).groupId);
+    $('#ls-h', root).textContent = at.filter(x => x.status === 'hadir').length;
+    $('#ls-t', root).textContent = at.filter(x => x.status === 'terlambat').length;
+    $('#ls-n', root).textContent = all.length - at.length;
+    const m = $(`[data-manual="${a.id}"]`, root); if (m) m.closest('.item').remove();
+  },
+  mount(root) {
+    if (PresensiPan.open) this.startLive(root);
+    root.addEventListener('change', e => { if (e.target.name === 'ps') { PresensiPan.sessionId = e.target.value; PresensiPan.attendees = []; App.refresh(); } });
+    root.addEventListener('click', e => {
+      const t = e.target;
+      const sLabel = s => `${Q.grp(s.groupId).name} · ${Q.subj(s.subjectId).code}`;
+      if (t.closest('[data-open]')) {
+        PresensiPan.open = true; PresensiPan.attendees = []; this.newCode();
+        const s = Q.session(PresensiPan.sessionId);
+        DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Membuka sesi presensi ${sLabel(s)}` });
+        toast('Sesi presensi dibuka. Tampilkan QR ke pelajar.'); return App.refresh();
+      }
+      if (t.closest('[data-refresh-qr]')) { this.newCode(); drawQR($('#qr-canvas', root), PresensiPan.code + PresensiPan.sessionId); $('#qr-code', root).textContent = PresensiPan.code; return toast('QR Code diperbarui.', 'info'); }
+      if (t.closest('[data-full]')) { const el = $('#qr-card', root); if (document.fullscreenElement) document.exitFullscreen(); else if (el.requestFullscreen) el.requestFullscreen(); return; }
+      if (t.closest('[data-close-sess]')) {
+        const s = Q.session(PresensiPan.sessionId), n = Q.studentsOf(s.groupId).length - PresensiPan.attendees.length;
+        PresensiPan.open = false;
+        DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Menutup sesi presensi ${sLabel(s)} (${PresensiPan.attendees.length} presensi)` });
+        toast(`Sesi ditutup. ${n} pelajar tanpa presensi & izin tercatat “Tidak hadir”.`, 'info'); return App.refresh();
+      }
+      const mn = t.closest('[data-manual]');
+      if (mn) {
+        const st = Q.student(mn.dataset.manual);
+        this.addAttendee(root, { id: st.id, time: nowHM(), status: 'hadir', manual: true });
+        DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Menandai manual ${st.name} → Hadir` });
+        return toast(`${esc(st.name)} ditandai hadir (tercatat di audit trail).`);
+      }
+      const ok = t.closest('[data-kok]'), no = t.closest('[data-kno]');
+      if (ok || no) {
+        const k = DB.corrections.find(x => x.id === (ok || no).dataset[ok ? 'kok' : 'kno']);
+        const st = Q.student(k.studentId);
+        k.status = ok ? 'approved' : 'rejected';
+        if (ok) Q.attOf(k.studentId)[k.sessionId] = { status: 'hadir', time: Q.session(k.sessionId).start };
+        DB.audit.unshift({ who: App.user.name, at: stamp(), what: ok ? `Koreksi presensi ${st.name} disetujui → Hadir` : `Koreksi presensi ${st.name} ditolak` });
+        toast(ok ? 'Koreksi disetujui. Status presensi diperbarui.' : 'Koreksi ditolak.', ok ? 'success' : 'info');
+        return App.refresh();
+      }
+    });
+  },
+};
+
+/* ---------- Perizinan ---------- */
+const IzinPan = { filter: 'aksi' };
+PanitiaPages.perizinan = {
+  title: 'Perizinan',
+  render() {
+    const all = scopeLeaves().slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const mine = myLeaveActions();
+    if (IzinPan.filter === 'aksi' && !App.has('wali', 'kurikulum')) IzinPan.filter = 'semua';
+    const filters = [
+      ...(App.has('wali', 'kurikulum') ? [['aksi', 'Perlu tindakan saya', mine.length]] : []),
+      ['semua', 'Semua', all.length],
+      ['wali', 'Menunggu Wali Kelas', all.filter(l => l.status === 'wali').length],
+      ['kurikulum', 'Menunggu Kurikulum', all.filter(l => l.status === 'kurikulum').length],
+      ['disetujui', 'Disetujui', all.filter(l => l.status === 'disetujui').length],
+      ['ditolak', 'Ditolak', all.filter(l => l.status === 'ditolak').length],
+    ];
+    const list = IzinPan.filter === 'aksi' ? mine : IzinPan.filter === 'semua' ? all : all.filter(l => l.status === IzinPan.filter);
+    const roleNote = App.isAdmin ? ['primary', 'Sebagai <b>Administrator</b>, kamu dapat melakukan verifikasi Wali Kelas maupun keputusan akhir Kurikulum untuk seluruh pengajuan.']
+      : App.has('kurikulum') ? ['primary', 'Sebagai <b>Kurikulum</b>, kamu memberi <b>keputusan akhir</b>. Persetujuan otomatis mengubah status presensi sesi tersebut menjadi “Izin”.']
+      : App.has('wali') ? ['primary', 'Sebagai <b>Wali Kelas</b>, kamu memberi <b>verifikasi awal</b> beserta catatan/rekomendasi sebelum diteruskan ke Kurikulum.']
+      : ['warning', 'Sebagai <b>Ketua BAT</b>, kamu memiliki akses <b>pemantauan</b> tanpa masuk ke alur persetujuan rutin.'];
+    return `
+    <div class="page-head"><div><h1>Perizinan</h1><p>Satu pengajuan untuk satu sesi, lampiran opsional. Alur: Pelajar → Wali Kelas (verifikasi awal) → Kurikulum (keputusan akhir) → status presensi diperbarui.</p></div></div>
+    <div class="alert alert-${roleNote[0]}" style="margin-bottom:16px">${icon('shield', 16)}<span>${roleNote[1]}</span></div>
+    ${Q.seeAll() ? `<div class="stats" style="margin-bottom:16px">
+      ${statCard('clipboard', all.length, 'Total pengajuan', 'primary')}
+      ${statCard('clock', all.filter(l => ['wali', 'kurikulum'].includes(l.status)).length, 'Dalam proses', 'warning')}
+      ${statCard('checkCircle', all.filter(l => l.status === 'disetujui').length, 'Disetujui', 'success')}
+      ${statCard('xCircle', all.filter(l => l.status === 'ditolak').length, 'Ditolak', 'danger')}
+    </div>` : ''}
+    <div class="chips" style="margin-bottom:16px">${filters.map(([k, l, n]) => `<button class="chip ${IzinPan.filter === k ? 'active' : ''}" data-f="${k}">${l}<span class="cnt">${n}</span></button>`).join('')}</div>
+    ${list.length ? `<div class="leave-grid">${list.map(l => this.card(l)).join('')}</div>` : `<div class="card">${emptyState('checkCircle', 'Tidak ada pengajuan', IzinPan.filter === 'aksi' ? 'Semua pengajuan sudah kamu tindak lanjuti.' : 'Tidak ada pengajuan pada kategori ini.')}</div>`}`;
+  },
+  card(l) {
+    const st = Q.student(l.studentId), s = Q.session(l.sessionId), g = Q.grp(s.groupId), sb = Q.subj(s.subjectId), m = LEAVE[l.status];
+    const canWali = l.status === 'wali' && App.has('wali') && Q.waliGroupIds().includes(g.id);
+    const canKur = l.status === 'kurikulum' && App.has('kurikulum');
+    return `<div class="leave-card">
+      <div class="leave-head"><div class="cell-user" style="min-width:0">${avatar(st.name)}<div><b>${esc(st.name)}</b><small>${esc(g.name)} · diajukan ${relStamp(l.createdAt)}</small></div></div>${badge(m.short, m.tone)}</div>
+      <div class="note primary" style="margin-top:12px">${icon('calendar', 15)}<span>${esc(sb.code)} · ${esc(s.topic)} · ${fmtDay(s.date)}, ${s.start}–${s.end}</span></div>
+      <p class="leave-reason"><b>${esc(l.reason)}</b> — ${esc(l.note)}</p>
+      ${l.file ? `<button class="file-chip" data-file="${esc(l.file)}">${icon('clip', 14)}<span>${esc(l.file)}</span></button>` : '<span class="muted small">Tanpa lampiran</span>'}
+      <details ${canWali || canKur ? '' : 'open'}><summary>${icon('activity', 14)} Lini masa verifikasi</summary>${leaveTimeline(l)}</details>
+      ${canWali ? `<div class="leave-actions">
+        <label class="field"><span>Rekomendasi Wali Kelas</span><select data-rec="${l.id}"><option>Direkomendasikan</option><option>Tidak direkomendasikan</option></select></label>
+        <label class="field"><span>Catatan untuk Kurikulum</span><textarea data-note="${l.id}" placeholder="cth. Sudah konfirmasi ke pelajar / orang tua…" style="min-height:70px"></textarea></label>
+        <div class="row"><button class="btn btn-primary btn-sm" data-wali="${l.id}">${icon('send', 14)} Verifikasi & teruskan ke Kurikulum</button></div>
+      </div>` : ''}
+      ${canKur ? `<div class="leave-actions">
+        <label class="field"><span>Catatan keputusan</span><textarea data-note="${l.id}" placeholder="Catatan ini dapat dilihat pelajar…" style="min-height:70px"></textarea></label>
+        <div class="row"><button class="btn btn-success btn-sm" data-ok="${l.id}">${icon('check', 14)} Setujui</button><button class="btn btn-danger btn-sm" data-no="${l.id}">${icon('x', 14)} Tolak</button></div>
+      </div>` : ''}
+    </div>`;
+  },
+  mount(root) {
+    root.addEventListener('click', e => {
+      const t = e.target;
+      const f = t.closest('[data-f]'); if (f) { IzinPan.filter = f.dataset.f; return App.refresh(); }
+      const fl = t.closest('[data-file]'); if (fl) return toast(`Membuka lampiran ${fl.dataset.file} (demo)`, 'info');
+      const w = t.closest('[data-wali]');
+      if (w) {
+        const l = DB.leaves.find(x => x.id === w.dataset.wali);
+        Object.assign(l, { status: 'kurikulum', waliRec: $(`[data-rec="${l.id}"]`, root).value, waliNote: $(`[data-note="${l.id}"]`, root).value.trim(), waliBy: App.user.name, waliAt: stamp() });
+        DB.activity.unshift({ who: App.user.name, what: 'memverifikasi izin', obj: Q.student(l.studentId).name, at: stamp(), icon: 'clipboard' });
+        toast('Diverifikasi & diteruskan ke Kurikulum.'); return App.refresh();
+      }
+      const ok = t.closest('[data-ok]'), no = t.closest('[data-no]');
+      if (ok || no) {
+        const l = DB.leaves.find(x => x.id === (ok || no).dataset[ok ? 'ok' : 'no']);
+        const note = $(`[data-note="${l.id}"]`, root).value.trim();
+        if (no && !note) { toast('Tuliskan catatan alasan penolakan untuk pelajar.', 'error'); $(`[data-note="${l.id}"]`, root).focus(); return; }
+        Object.assign(l, { status: ok ? 'disetujui' : 'ditolak', decisionNote: note || 'Disetujui.', decisionBy: App.user.name, decisionAt: stamp() });
+        const st = Q.student(l.studentId);
+        if (ok) {
+          Q.attOf(l.studentId)[l.sessionId] = { status: 'izin', time: null };
+          DB.audit.unshift({ who: 'Sistem', at: stamp(), what: `Status presensi ${st.name} otomatis menjadi “Izin” (pengajuan disetujui)` });
+        }
+        if (st.id === 'p1') DB.notifications.pelajar.unshift({ title: `Izin ${ok ? 'disetujui' : 'ditolak'}`, text: note || 'Pengajuan izinmu disetujui Kurikulum.', at: stamp(), unread: true, icon: 'clipboard' });
+        toast(ok ? 'Izin disetujui. Status presensi otomatis menjadi “Izin”.' : 'Izin ditolak. Catatan dikirim ke pelajar.', ok ? 'success' : 'info');
+        return App.refresh();
+      }
+    });
+  },
+};
+
+/* ---------- Laporan Perkembangan ---------- */
+const LapState = { grp: 'all' };
+PanitiaPages.laporan = {
+  title: 'Laporan Perkembangan',
+  render() {
+    const groups = Q.myGroups();
+    if (LapState.grp !== 'all' && !groups.find(g => g.id === LapState.grp)) LapState.grp = 'all';
+    const students = Q.scopeStudents().filter(s => LapState.grp === 'all' || s.groupId === LapState.grp);
+    const atts = students.map(s => Q.attStats(s.id).pct);
+    const tavg = students.map(s => Q.taskAvg(s.id));
+    const tos = students.map(s => Q.lastTO(s.id));
+    const watch = students.filter(s => Q.attStats(s.id).pct < 80 || Q.taskAvg(s.id) < 72);
+    const toTrend = [0, 1, 2, 3].map(i => avg(students.map(s => (s.id === 'p1' ? DB.tryouts.map(Q.toAvg) : s.toHist)[i])));
+    const scopeLabel = Q.seeAll() ? 'Rekap menyeluruh seluruh Kelompok Kelas' : App.has('wali') ? 'Pelajar di Kelompok Kelas dampinganmu' : 'Pelajar di Kelompok Kelas yang kamu ajar';
+    return `
+    <div class="page-head">
+      <div><h1>Laporan Perkembangan</h1><p>${scopeLabel}. Data kehadiran, nilai tugas, dan hasil tryout eksternal.</p></div>
+      <div class="actions"><button class="btn btn-ghost" data-dl>${icon('download', 16)} Unduh rekap</button>${App.has('kurikulum') ? `<button class="btn btn-primary" data-to>${icon('upload', 16)} Input hasil tryout</button>` : ''}</div>
+    </div>
+    <div class="chips" style="margin-bottom:16px">
+      <button class="chip ${LapState.grp === 'all' ? 'active' : ''}" data-grp="all">Semua Kelompok Kelas</button>
+      ${groups.map(g => `<button class="chip ${LapState.grp === g.id ? 'active' : ''}" data-grp="${g.id}">${esc(g.name)}</button>`).join('')}
+    </div>
+    <div class="stats">
+      ${statCard('checkCircle', avg(atts) + '%', 'Rata-rata kehadiran', 'success', `${students.length} pelajar`)}
+      ${statCard('target', avg(tavg), 'Rata-rata nilai tugas', 'primary')}
+      ${statCard('trending', avg(tos), 'Rata-rata tryout terakhir', 'accent', `${toTrend[3] - toTrend[2] >= 0 ? '▲ +' : '▼ '}${toTrend[3] - toTrend[2]} dari TO sebelumnya`)}
+      ${statCard('alert', watch.length, 'Perlu perhatian', 'danger', 'Kehadiran <80% / nilai <72')}
+    </div>
+    <div class="cols cols-1-1">
+      <div class="card"><div class="card-head"><h3>Kehadiran per Kelompok Kelas</h3></div>
+        ${barChart(groups.filter(g => LapState.grp === 'all' || g.id === LapState.grp).map(g => ({ label: g.name, value: avg(Q.studentsOf(g.id).map(s => Q.attStats(s.id).pct)), color: g.color })), { max: 100, suffix: '%' })}
+      </div>
+      <div class="card"><div class="card-head"><h3>Tren rata-rata tryout eksternal</h3></div>
+        ${lineChart(toTrend.map((v, i) => ({ label: 'TO #' + (i + 1), value: v })), { min: 400, max: 700, color: '#ffb547', steps: 3, h: 210 })}
+      </div>
+    </div>
+    <div class="card mt">
+      <div class="card-head"><h3>Rekap pelajar</h3><span class="muted small">Klik baris untuk detail</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Pelajar</th><th>Kelompok Kelas</th><th style="width:170px">Kehadiran</th><th>Nilai tugas</th><th>Tryout terakhir</th><th>Status</th></tr></thead><tbody>
+        ${students.map(s => { const p = Q.attStats(s.id).pct, t = Q.taskAvg(s.id), flag = p < 80 || t < 72; return `<tr style="cursor:pointer" data-detail="${s.id}"><td><div class="cell-user">${avatar(s.name, 'sm')}<div><b>${esc(s.name)}</b><small>${esc(s.school)}</small></div></div></td><td>${tag(Q.grp(s.groupId))}</td><td>${progRow(p, toneByPct(p))}</td><td><b>${t}</b></td><td>${Q.lastTO(s.id)}</td><td>${flag ? badge('Perlu perhatian', 'danger') : badge('Baik', 'success')}</td></tr>`; }).join('')}
+      </tbody></table></div>
+    </div>`;
+  },
+  mount(root) {
+    root.addEventListener('click', e => {
+      const c = e.target.closest('[data-grp]'); if (c) { LapState.grp = c.dataset.grp; return App.refresh(); }
+      const d = e.target.closest('[data-detail]'); if (d) return studentDetailModal(d.dataset.detail);
+      if (e.target.closest('[data-dl]')) return toast('Rekap laporan disiapkan (demo).', 'info');
+      if (e.target.closest('[data-to]')) return this.tryoutModal();
+    });
+  },
+  tryoutModal() {
+    const subs = ['PU', 'PPU', 'PBM', 'PK', 'LBI', 'LBE', 'PM'];
+    openModal({
+      title: 'Input hasil tryout eksternal', sub: 'BAT tidak menyelenggarakan tryout di aplikasi; hasil dari platform eksternal diinput di sini.', size: 'lg',
+      body: `<div class="form-grid two">
+        <label class="field"><span>Pelajar</span><select id="to-st">${DB.students.map(s => `<option value="${s.id}">${esc(s.name)} · ${esc(Q.grp(s.groupId).name)}</option>`).join('')}</select></label>
+        <label class="field"><span>Nama tryout</span><input id="to-name" value="Tryout Eksternal #5"></label>
+        <label class="field"><span>Platform penyelenggara</span><input id="to-plat" placeholder="cth. Mitra TO Nasional"></label>
+        <label class="field"><span>Tanggal</span><input type="date" id="to-date" value="${todayStr()}"></label>
+      </div>
+      <div class="field"><span>Skor per subtes (0–1000)</span></div>
+      <div class="form-grid" style="grid-template-columns:repeat(auto-fill,minmax(110px,1fr))">${subs.map(k => `<label class="field"><span>${k}</span><input type="number" min="0" max="1000" data-sub="${k}" placeholder="0"></label>`).join('')}</div>
+      <div class="note info">${icon('upload', 15)}<span>Punya banyak data? Unggah berkas CSV/Excel dari platform tryout (tersedia di versi penuh).</span></div>`,
+      footer: `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="to-save">Simpan hasil</button>`,
+      onMount(m) {
+        $('#to-save', m).addEventListener('click', () => {
+          const scores = {}; let bad = false;
+          $$('[data-sub]', m).forEach(i => { const v = Number(i.value); i.style.borderColor = ''; if (i.value === '' || isNaN(v) || v < 0 || v > 1000) { i.style.borderColor = 'var(--danger)'; bad = true; } scores[i.dataset.sub] = v; });
+          if (bad) return toast('Lengkapi semua skor subtes (0–1000).', 'error');
+          const sid = $('#to-st', m).value, st = Q.student(sid);
+          const t = { id: 'to' + Date.now(), name: $('#to-name', m).value || 'Tryout Eksternal', platform: $('#to-plat', m).value || '-', date: $('#to-date', m).value, scores };
+          if (sid === 'p1') DB.tryouts.push(t); else { st.toHist.shift(); st.toHist.push(Q.toAvg(t)); }
+          closeModal(); toast(`Hasil tryout ${esc(st.name)} tersimpan (rata-rata ${Q.toAvg(t)}).`); App.refresh();
+        });
+      },
+    });
+  },
+};
+
+/* ---------- Pengguna & Peran (Administrator) ---------- */
+const UserState = { role: 'all' };
+PanitiaPages.pengguna = {
+  title: 'Pengguna & Peran',
+  render() {
+    const roles = Object.keys(DB.roles);
+    const list = DB.staff.filter(s => UserState.role === 'all' || s.role === UserState.role);
+    return `
+    <div class="page-head">
+      <div><h1>Pengguna & Peran</h1><p>Kelola akun panitia dan perannya. Setiap akun panitia memegang satu peran operasional.</p></div>
+      <div class="actions"><button class="btn btn-primary" data-new-user>${icon('userPlus', 16)} Tambah panitia</button></div>
+    </div>
+    <div class="alert alert-primary" style="margin-bottom:16px">${icon('shield', 16)}<span><b>Tutor tidak boleh sekaligus Wali Kelas.</b> Penempatan pelajar, tutor, dan Wali Kelas hanya dapat diubah oleh Kurikulum dan Administrator.</span></div>
+    <div class="stats">
+      ${statCard('user', DB.staff.filter(s => s.role === 'tutor').length, 'Tutor', 'primary')}
+      ${statCard('users', DB.staff.filter(s => s.role === 'wali').length, 'Wali Kelas', 'accent')}
+      ${statCard('book', DB.staff.filter(s => s.role === 'kurikulum').length, 'Kurikulum', 'info')}
+      ${statCard('key', DB.staff.filter(s => ['ketua', 'admin'].includes(s.role)).length, 'Ketua & Administrator', 'success')}
+    </div>
+    <div class="card">
+      <div class="chips" style="margin-bottom:14px"><button class="chip ${UserState.role === 'all' ? 'active' : ''}" data-role="all">Semua<span class="cnt">${DB.staff.length}</span></button>${roles.map(r => `<button class="chip ${UserState.role === r ? 'active' : ''}" data-role="${r}">${DB.roles[r]}<span class="cnt">${DB.staff.filter(s => s.role === r).length}</span></button>`).join('')}</div>
+      <div class="table-wrap"><table><thead><tr><th>Panitia</th><th>Peran</th><th>Penugasan</th><th></th></tr></thead><tbody>
+        ${list.map(s => `<tr><td><div class="cell-user">${avatar(s.name, 'sm')}<div><b>${esc(s.name)}</b><small>${esc(s.email)}</small></div></div></td>
+          <td>${badge(DB.roles[s.role], s.role === 'admin' ? 'danger' : s.role === 'wali' ? 'accent' : 'primary', 'no-dot')}</td>
+          <td>${this.assignment(s)}</td>
+          <td style="text-align:right"><button class="btn btn-sm btn-ghost" data-edit-user="${s.id}">${icon('edit', 14)} Ubah</button></td></tr>`).join('')}
+      </tbody></table></div>
+    </div>`;
+  },
+  assignment(s) {
+    if (s.role === 'tutor') {
+      const up = DB.sessions.filter(x => x.tutor === s.name && Q.isUpcoming(x)).length;
+      return `<div class="row wrap" style="gap:4px">${s.subjects.map(id => stag(Q.subj(id))).join('')}</div><div class="muted small">${up} sesi mendatang</div>`;
+    }
+    if (s.role === 'wali') { const gs = DB.groups.filter(g => g.wali === s.name); return gs.length ? `<div class="row wrap" style="gap:4px">${gs.map(tag).join('')}</div>` : '<span class="muted small">Belum memegang kelompok</span>'; }
+    return '<span class="muted small">Seluruh BAT</span>';
+  },
+  mount(root) {
+    root.addEventListener('click', e => {
+      const r = e.target.closest('[data-role]'); if (r) { UserState.role = r.dataset.role; return App.refresh(); }
+      const ed = e.target.closest('[data-edit-user]'); if (ed) return this.form(ed.dataset.editUser);
+      if (e.target.closest('[data-new-user]')) return this.form(null);
+    });
+  },
+  form(id) {
+    const s = id ? DB.staff.find(x => x.id === id) : null;
+    const subjChecks = sel => DB.subjects.filter(x => x.active || sel.includes(x.id)).map(x => `<label class="check-chip"><input type="checkbox" value="${x.id}" ${sel.includes(x.id) ? 'checked' : ''}><span style="--c:${x.color}"><b>${esc(x.code)}</b><small>${esc(x.name)}</small></span></label>`).join('');
+    openModal({
+      title: s ? 'Ubah peran panitia' : 'Tambah panitia', sub: s ? s.name : 'Akun baru menerima email undangan.', size: 'lg',
+      body: `<div class="form-grid two">
+        <label class="field"><span>Nama lengkap</span><input id="uf-name" value="${s ? esc(s.name) : ''}" ${s ? 'disabled title="Nama terhubung ke jadwal & riwayat"' : ''}><small class="field-err"></small></label>
+        <label class="field"><span>Email</span><input id="uf-email" type="email" value="${s ? esc(s.email) : ''}" placeholder="nama@bat.id"><small class="field-err"></small></label>
+        <label class="field span-2"><span>Peran</span><select id="uf-role">${Object.entries(DB.roles).map(([k, v]) => `<option value="${k}" ${s && s.role === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+        <div class="field span-2" id="uf-subj-wrap"><span>Mata Pelajaran yang diampu</span><div class="check-grid" id="uf-subj">${subjChecks(s ? s.subjects : [])}</div><small class="field-err" id="uf-subj-err"></small></div>
+      </div>
+      <div id="uf-warn"></div>
+      <div class="note info">${icon('shield', 15)}<span>Satu akun memegang satu peran. Tutor tidak dapat merangkap Wali Kelas; Wali Kelas tidak dapat dijadwalkan mengajar.</span></div>`,
+      footer: `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="uf-save">${icon('check', 16)} Simpan</button>`,
+      onMount(m) {
+        const sync = () => { $('#uf-subj-wrap', m).classList.toggle('hidden', $('#uf-role', m).value !== 'tutor'); $('#uf-warn', m).innerHTML = ''; };
+        $('#uf-role', m).addEventListener('change', sync); sync();
+        $('#uf-save', m).addEventListener('click', () => {
+          const name = $('#uf-name', m).value.trim(), email = $('#uf-email', m).value.trim(), role = $('#uf-role', m).value;
+          const subjects = role === 'tutor' ? $$('#uf-subj input:checked', m).map(i => i.value) : [];
+          fieldErr($('#uf-name', m), name ? '' : 'Nama wajib diisi.');
+          fieldErr($('#uf-email', m), /^\S+@\S+\.\S+$/.test(email) ? '' : 'Format email tidak valid.');
+          $('#uf-subj-err', m).textContent = role === 'tutor' && !subjects.length ? 'Pilih minimal satu mapel.' : '';
+          if (!name || !/^\S+@\S+\.\S+$/.test(email) || (role === 'tutor' && !subjects.length)) return;
+          // Aturan: Tutor ≠ Wali Kelas — cegah perubahan peran yang melanggar penugasan berjalan
+          if (s && s.role !== role) {
+            const held = DB.groups.filter(g => g.wali === s.name);
+            const teach = DB.sessions.filter(x => x.tutor === s.name && Q.isUpcoming(x));
+            const msg = s.role === 'wali' && held.length ? `${esc(s.name)} masih menjadi Wali Kelas untuk <b>${held.map(g => esc(g.name)).join(', ')}</b>. Ganti Wali Kelas kelompok tersebut terlebih dahulu.`
+              : s.role === 'tutor' && teach.length ? `${esc(s.name)} masih dijadwalkan mengajar <b>${teach.length} sesi mendatang</b>. Alihkan sesi ke tutor lain di Manajemen Jadwal terlebih dahulu.` : '';
+            if (msg) { $('#uf-warn', m).innerHTML = `<div class="alert alert-danger">${icon('alert', 16)}<span>${msg}</span></div>`; return; }
+          }
+          if (s) Object.assign(s, { email, role, subjects });
+          else DB.staff.push({ id: 'st' + Date.now(), name, email, role, subjects });
+          closeModal(); toast(s ? `Peran ${esc(s.name)} diperbarui.` : `${esc(name)} ditambahkan sebagai ${DB.roles[role]}.`); App.refresh();
+        });
+      },
+    });
+  },
+};
+
+/* ---------- Pengaturan ---------- */
+PanitiaPages.pengaturan = {
+  title: 'Pengaturan',
+  render() {
+    const u = App.user;
+    const canSys = App.has('kurikulum');
+    const M = [
+      ['Kelompok Kelas & penempatan', 'Lihat kelompok sendiri', 'Lihat (kelompok diajar)', 'Lihat (dampingan)', 'Kelola & tempatkan', 'Pantau', 'Kelola penuh'],
+      ['Mata Pelajaran', 'Lihat', 'Lihat', 'Lihat', 'Kelola', 'Pantau', 'Kelola penuh'],
+      ['Jadwal sesi', 'Lihat', 'Lihat', 'Lihat', 'Kelola + cek bentrok', 'Pantau', 'Kelola penuh'],
+      ['Materi (per mapel)', 'Akses', 'Kelola mapel diampu', '–', 'Kelola', 'Pantau', 'Kelola penuh'],
+      ['Tugas dan nilai', 'Kumpul, lihat nilai', 'Kelola, menilai', '–', 'Kelola', 'Pantau', 'Kelola penuh'],
+      ['Presensi', 'Presensi, koreksi', 'Buka sesi sendiri', 'Pantau dampingan', 'Pantau, koreksi', 'Pantau', 'Kelola penuh'],
+      ['Perizinan (per sesi)', 'Ajukan', '–', 'Verifikasi awal', 'Keputusan akhir', 'Pantau', 'Kelola penuh'],
+      ['Laporan perkembangan', 'Milik sendiri', 'Kelompok diajar', 'Pelajar dampingan', 'Menyeluruh, input tryout', 'Menyeluruh', 'Menyeluruh'],
+      ['Pengguna & peran', '–', '–', '–', '–', '–', 'Kelola'],
+    ];
+    return `
+    <div class="page-head"><div><h1>Pengaturan</h1><p>Profil akun, peran & hak akses, serta konfigurasi presensi.</p></div></div>
+    <div class="cols cols-3-2">
+      <div>
+        <div class="card">
+          <div class="card-head"><h3>Profil akun</h3></div>
+          <div class="row" style="gap:16px;margin-bottom:18px">${avatar(u.name, 'lg')}<div><b style="font-size:18px">${esc(u.name)}</b><p class="muted">${esc(u.email)}</p><div class="role-chips" style="margin-top:8px">${roleBadges(u)}</div></div></div>
+          <div class="form-grid two">
+            <label class="field"><span>Nama lengkap</span><input id="st-name" value="${esc(u.name)}"></label>
+            <label class="field"><span>Email</span><input value="${esc(u.email)}" disabled></label>
+          </div>
+          <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn btn-ghost" data-pw>${icon('lock', 16)} Ubah kata sandi</button><button class="btn btn-primary" data-save-profile>Simpan profil</button></div>
+        </div>
+        <div class="card mt">
+          <div class="card-head"><h3>${icon('shield', 16)} Matriks hak akses</h3><span class="muted small">Tutor dan Wali Kelas tidak dapat dirangkap</span></div>
+          <div class="table-wrap"><table class="matrix"><thead><tr><th>Fitur</th><th>Pelajar</th><th>Tutor</th><th>Wali Kelas</th><th>Kurikulum</th><th>Ketua BAT</th><th>Administrator</th></tr></thead><tbody>
+            ${M.map(r => `<tr>${r.map((c, i) => `<td>${i === 0 ? `<b>${c}</b>` : c}</td>`).join('')}</tr>`).join('')}
+          </tbody></table></div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-head"><h3>${icon('qr', 16)} Pengaturan presensi</h3>${canSys ? '' : badge('Hanya Kurikulum/Admin', 'neutral', 'no-dot')}</div>
+          <div class="form-grid">
+            <label class="field"><span>Toleransi keterlambatan default (menit)</span><input type="number" id="st-late" value="${DB.settings.lateTolerance}" min="0" max="60" ${canSys ? '' : 'disabled'}></label>
+            <label class="field"><span>QR Code diperbarui setiap (detik)</span><input type="number" id="st-qr" value="${DB.settings.qrRefresh}" min="10" max="120" ${canSys ? '' : 'disabled'}></label>
+            <label class="field"><span>Batas pengajuan izin</span><select id="st-izin" ${canSys ? '' : 'disabled'}>${['H-0', 'H-1', 'H-2'].map(v => `<option ${DB.settings.leaveDeadline === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+            <label class="field"><span>Batas pengajuan koreksi presensi (hari)</span><input type="number" id="st-corr" value="${DB.settings.correctionWindow}" min="1" max="7" ${canSys ? '' : 'disabled'}></label>
+          </div>
+          ${canSys ? `<button class="btn btn-primary btn-block mt" data-save-sys>Simpan pengaturan</button>` : ''}
+        </div>
+        <div class="card mt">
+          <div class="card-head"><h3>${icon('bell', 16)} Notifikasi</h3></div>
+          ${[['Pengajuan izin baru', true], ['Pengumpulan tugas', true], ['Koreksi presensi', true], ['Ringkasan harian via email', false]].map(([t, on]) => `<div class="setting-row"><div><b>${t}</b></div><label class="switch"><input type="checkbox" ${on ? 'checked' : ''} data-toggle><span></span></label></div>`).join('')}
+        </div>
+        <div class="card mt">
+          <div class="setting-row"><div><b>Keluar dari akun</b><small>Akhiri sesi di perangkat ini</small></div><button class="btn btn-sm btn-danger" data-action="logout">${icon('logout', 14)} Keluar</button></div>
+        </div>
+      </div>
+    </div>`;
+  },
+  mount(root) {
+    root.addEventListener('change', e => { if (e.target.matches('[data-toggle]')) toast('Preferensi notifikasi disimpan.'); });
+    root.addEventListener('click', e => {
+      if (e.target.closest('[data-pw]')) return openPasswordModal();
+      if (e.target.closest('[data-save-profile]')) return toast('Profil disimpan (demo).');
+      if (e.target.closest('[data-save-sys]')) {
+        DB.settings.lateTolerance = Number($('#st-late', root).value) || 15;
+        DB.settings.qrRefresh = Math.max(10, Number($('#st-qr', root).value) || 30);
+        DB.settings.leaveDeadline = $('#st-izin', root).value;
+        DB.settings.correctionWindow = Number($('#st-corr', root).value) || 2;
+        toast('Pengaturan presensi disimpan.');
+      }
+    });
+  },
+};
