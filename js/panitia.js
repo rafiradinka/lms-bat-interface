@@ -28,14 +28,19 @@ PanitiaPages.dashboard = {
     const students = Q.scopeStudents();
     const scopeSess = Q.scopeSessions();
     const todays = scopeSess.filter(s => s.date === todayStr());
-    const weekPast = scopeSess.filter(s => dayDiff(s.date) >= -7 && dayDiff(s.date) < 0);
-    const weekPct = weekPast.length ? avg(weekPast.map(s => sessionRecap(s).pct)) : 0;
+    // Ringkasan kehadiran 7 hari terakhir: Σ pelajar hadir (hadir + terlambat) seluruh kelompok × mapel per hari / Σ pelajar seharusnya
+    const days7 = dailyAttendance(scopeSess, 7);
+    const week = aggAttendance(scopeSess.filter(s => dayDiff(s.date) >= -7 && dayDiff(s.date) < 0));
     const leaveAct = myLeaveActions();
     const toGrade = App.has('tutor', 'kurikulum') ? Q.myAssignments().filter(a => a.submitted > a.graded) : [];
     const corr = App.has('tutor', 'kurikulum') ? DB.corrections.filter(k => k.status === 'pending' && Q.canRunSession(Q.session(k.sessionId))) : [];
     const pendingAll = DB.leaves.filter(l => ['wali', 'kurikulum'].includes(l.status)).length;
-    const last7 = scopeSess.filter(s => s.date < todayStr()).slice(-7);
     const monitorOnly = App.has('ketua') && !App.has('kurikulum', 'wali');
+    // 3 pelajar dengan kehadiran terendah (global, pelajar aktif yang sudah punya catatan presensi)
+    const lowest = Q.activeStudents().map(s => ({ s, st: Q.attStats(s.id) })).filter(x => x.st.total > 0)
+      .sort((a, b) => a.st.pct - b.st.pct || a.s.name.localeCompare(b.s.name)).slice(0, 3);
+    // Aktivitas pembelajaran: hanya aktivitas panitia
+    const staffAct = DB.activity.filter(a => Q.staffByName(a.who));
 
     const actions = [
       ...leaveAct.map(l => { const st = Q.student(l.studentId); return { ic: 'clipboard', tone: 'var(--warning)', title: `${l.status === 'wali' ? 'Verifikasi' : 'Putuskan'} izin ${st.name}`, sub: `${l.reason} · ${Q.grp(st.groupId).name}`, go: 'perizinan', b: badge(l.status === 'wali' ? 'Wali Kelas' : 'Kurikulum', l.status === 'wali' ? 'warning' : 'info') }; }),
@@ -47,30 +52,29 @@ PanitiaPages.dashboard = {
     <div class="page-head">
       <div><p class="eyebrow">${fmtLong(todayStr())}</p><h1>${greeting()}, ${esc(firstName(u.name))}!</h1>
         <div class="role-chips" style="margin-top:8px">${roleBadges(u)}</div></div>
-      ${App.has('kurikulum', 'tutor', 'wali') ? `<div class="actions"><button class="btn btn-ghost" data-ann>${icon('megaphone', 16)} Pengumuman</button>${todays.some(Q.canRunSession) ? `<a class="btn btn-primary" href="#/presensi">${icon('qr', 16)} Buka presensi</a>` : ''}</div>` : ''}
+      ${App.has('kurikulum', 'tutor', 'wali') ? `<div class="actions"><button class="btn btn-ghost" data-ann>${icon('megaphone', 16)} Pengumuman</button></div>` : ''}
     </div>
     ${App.isAdmin ? `<div class="alert alert-primary" style="margin-bottom:16px">${icon('key', 16)}<span>Masuk sebagai <b>Administrator</b>: akses penuh ke seluruh modul, termasuk penempatan pelajar, tutor, Wali Kelas, serta menu <a href="#/pengguna" style="text-decoration:underline">Pengguna & Peran</a>.</span></div>` : ''}
     <div class="stats">
-      ${statCard('users', students.length, Q.seeAll() ? 'Pelajar aktif' : 'Pelajar di kelompokku', 'primary', `${students.filter(s => s.status === 'Gap Year').length} alumni / gap year`)}
+      ${statCard('users', students.length, Q.seeAll() ? 'Pelajar aktif' : 'Pelajar aktif di kelompokku', 'primary')}
       ${statCard('layers', groups.length, 'Kelompok Kelas', 'info', `${todays.length} sesi hari ini`)}
-      ${statCard('checkCircle', weekPct + '%', 'Kehadiran 7 hari', 'success', `${weekPast.length} sesi berjalan`)}
-      ${statCard('clipboard', monitorOnly ? pendingAll : leaveAct.length, monitorOnly ? 'Izin dalam proses' : 'Izin menunggu saya', 'warning', monitorOnly ? 'Mode pantau' : 'Butuh tindakan')}
+      ${statCard('checkCircle', week.pct == null ? '—' : week.pct + '%', 'Kehadiran 7 hari', 'success', `${week.present}/${week.expected} kehadiran · ${week.sessions} sesi`)}
+      ${statCard('clipboard', monitorOnly ? pendingAll : leaveAct.length, monitorOnly ? 'Izin dalam proses' : 'Izin menunggu verifikasi', 'warning', monitorOnly ? 'Mode pantau' : 'Butuh tindakan')}
     </div>
     <div class="cols cols-3-2">
       <div class="card">
-        <div class="card-head"><h3>${icon('calendar', 16)} ${App.has('tutor') && !Q.seeAll() ? 'Sesi saya hari ini' : 'Jadwal hari ini'}</h3><a class="link" href="#/jadwal">Kalender ${icon('right', 14)}</a></div>
+        <div class="card-head"><h3>${icon('calendar', 16)} ${App.has('tutor') && !Q.seeAll() ? 'Sesi saya hari ini' : 'Jadwal pembelajaran hari ini'}</h3><a class="link" href="#/jadwal">Kalender ${icon('right', 14)}</a></div>
         <div class="agenda">
           ${todays.length ? todays.map(s => {
             const g = Q.grp(s.groupId), sb = Q.subj(s.subjectId), st = Q.state(s), r = sessionRecap(s);
-            return `<div class="agenda-item" style="--c:${sb.color}"><div class="agenda-time"><b>${s.start}</b><span>${s.end}</span></div>
+            return `<div class="agenda-item ${st.key === 'selesai' ? 'is-past' : ''}" style="--c:${sb.color}"><div class="agenda-time"><b>${s.start}</b><span>${s.end}</span></div>
               <div class="agenda-card"><div class="agenda-top">${stag(sb)}${tag(g)}${badge(st.label, st.tone)}</div><h4>${esc(s.topic)}</h4>
-              <div class="meta-row"><span>${icon('pin', 14)} ${esc(s.location)}</span><span>${icon('user', 14)} ${esc(s.tutor)}</span><span>${icon('users', 14)} ${r.total} pelajar</span></div>
-              ${Q.canRunSession(s) && st.key !== 'selesai' ? `<div class="agenda-actions"><a class="btn btn-sm btn-primary" href="#/presensi">${icon('qr', 14)} Buka sesi presensi</a></div>` : ''}</div></div>`;
-          }).join('') : emptyState('calendar', 'Tidak ada sesi hari ini', 'Nikmati harimu! Cek kalender untuk jadwal berikutnya.')}
+              <div class="meta-row"><span>${icon('pin', 14)} ${esc(s.location)}</span><span>${icon('user', 14)} ${esc(s.tutor)}</span><span>${icon('users', 14)} ${r.total} pelajar</span></div></div></div>`;
+          }).join('') : emptyState('calendar', 'Tidak ada sesi hari ini', 'Cek kalender untuk jadwal berikutnya.')}
         </div>
       </div>
       <div class="card">
-        <div class="card-head"><h3>${icon('bell', 16)} Menunggu tindakan saya</h3>${actions.length ? badge(actions.length, 'danger', 'no-dot') : ''}</div>
+        <div class="card-head"><h3>${icon('bell', 16)} Notifikasi administrasi</h3>${actions.length ? badge(actions.length, 'danger', 'no-dot') : ''}</div>
         <div class="list">
           ${actions.length ? actions.slice(0, 7).map(a => `<a class="item clickable" href="#/${a.go}"><div class="item-ic" style="--c:${a.tone}">${icon(a.ic, 18)}</div><div class="item-body"><div class="item-title">${esc(a.title)}</div><div class="item-sub">${esc(a.sub)}</div></div>${a.b}</a>`).join('')
           : emptyState('checkCircle', monitorOnly ? 'Mode pantau' : 'Semua beres!', monitorOnly ? 'Ketua BAT memantau tanpa masuk alur persetujuan rutin.' : 'Tidak ada tindakan yang menunggu.')}
@@ -79,13 +83,18 @@ PanitiaPages.dashboard = {
     </div>
     <div class="cols cols-3-2">
       <div class="card">
-        <div class="card-head"><h3>${icon('chart', 16)} Kehadiran 7 sesi terakhir</h3>${badge('Hadir + terlambat', 'neutral', 'no-dot')}</div>
-        ${last7.length ? barChart(last7.map(s => ({ label: `${fmtDate(s.date, { day: 'numeric', month: 'numeric' })} ${Q.subj(s.subjectId).code}`, value: sessionRecap(s).pct, color: Q.subj(s.subjectId).color })), { max: 100, suffix: '%' }) : emptyState('chart', 'Belum ada data')}
+        <div class="card-head"><h3>${icon('chart', 16)} Ringkasan kehadiran 7 hari terakhir</h3>${badge('Hadir + terlambat', 'neutral', 'no-dot')}</div>
+        ${barChart(days7.map(d => ({ label: fmtDate(d.date, { weekday: 'short', day: 'numeric' }), title: `${fmtDay(d.date)} · ${d.present}/${d.expected} pelajar hadir dari ${d.sessions} sesi`, value: d.pct, color: d.pct == null ? null : toneByPct(d.pct) })), { max: 100, suffix: '%' })}
+        <p class="muted small" style="margin-top:10px">Per hari: total pelajar hadir di seluruh Kelompok Kelas &amp; mapel ÷ total pelajar yang seharusnya hadir hari itu. “—” = tidak ada sesi.</p>
       </div>
       <div class="card">
-        <div class="card-head"><h3>${icon('activity', 16)} Aktivitas terbaru</h3></div>
-        ${DB.activity.slice(0, 6).map(a => `<div class="activity">${avatar(a.who, 'sm')}<div><p><b>${esc(a.who)}</b> ${a.what} <b>${esc(a.obj)}</b></p><time>${relStamp(a.at)}</time></div></div>`).join('')}
+        <div class="card-head"><h3>${icon('alert', 16)} Kehadiran terendah</h3>${badge('Global', 'neutral', 'no-dot')}</div>
+        ${lowest.length ? `<div class="low-rank">${lowest.map((x, i) => `<div class="lr-item"><span class="lr-no">${i + 1}</span><div class="lr-body"><b>${esc(x.s.name)}</b>${progRow(x.st.pct, toneByPct(x.st.pct))}</div></div>`).join('')}</div>` : emptyState('users', 'Belum ada data kehadiran')}
       </div>
+    </div>
+    <div class="card mt">
+      <div class="card-head"><h3>${icon('activity', 16)} Aktivitas pembelajaran panitia</h3></div>
+      ${staffAct.length ? staffAct.slice(0, 6).map(a => `<div class="activity">${avatar(a.who, 'sm')}<div><p><b>${esc(a.who)}</b> ${a.what} <b>${esc(a.obj)}</b></p><time>${relStamp(a.at)}</time></div></div>`).join('') : emptyState('activity', 'Belum ada aktivitas')}
     </div>`;
   },
   mount(root) {
@@ -94,14 +103,28 @@ PanitiaPages.dashboard = {
 };
 
 /* ---------- Manajemen Pelajar ---------- */
-const PelajarMgmt = { q: '', grp: 'all' };
+const PelajarMgmt = { q: '', grp: 'all', st: 'on' };
+/* Kata sandi acak untuk akun pelajar baru (tanpa karakter yang mirip: 0/O, 1/l/I) */
+function genPassword(n = 10) {
+  const cs = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const buf = new Uint32Array(n);
+  (window.crypto || {}).getRandomValues ? crypto.getRandomValues(buf) : buf.forEach((_, i) => { buf[i] = Math.floor(Math.random() * 4294967296); });
+  return Array.from(buf, x => cs[x % cs.length]).join('');
+}
 PanitiaPages.pelajar = {
   title: 'Manajemen Pelajar',
+  /* Daftar pelajar dalam cakupan peran, termasuk yang nonaktif (khusus halaman ini) */
+  pool() {
+    if (Q.seeAll()) return DB.students;
+    const ids = Q.myGroupIds();
+    return DB.students.filter(s => ids.includes(s.groupId));
+  },
   render() {
     const groups = Q.myGroups();
     const canPlace = Q.canPlace();
-    const all = Q.scopeStudents();
+    const all = this.pool(), active = all.filter(Q.isActive), off = all.length - active.length;
     const scope = Q.seeAll() ? 'Seluruh pelajar BAT' : 'Pelajar di Kelompok Kelas yang kamu dampingi';
+    const cnt = k => all.filter(s => k === 'all' || (k === 'on' ? Q.isActive(s) : !Q.isActive(s))).length;
     return `
     <div class="page-head">
       <div><h1>Manajemen Pelajar</h1><p>${scope}. Setiap pelajar terdaftar di tepat satu Kelompok Kelas.</p></div>
@@ -109,38 +132,40 @@ PanitiaPages.pelajar = {
     </div>
     ${!canPlace ? `<div class="alert alert-primary" style="margin-bottom:16px">${icon('shield', 16)}<span>Penempatan pelajar ke Kelompok Kelas hanya dapat diubah oleh Kurikulum atau Administrator.</span></div>` : ''}
     <div class="stats">
-      ${statCard('users', all.length, 'Total pelajar', 'primary')}
-      ${statCard('book', all.filter(s => s.status === 'Kelas 12').length, 'Kelas 12', 'info')}
-      ${statCard('flag', all.filter(s => s.status === 'Gap Year').length, 'Alumni / gap year', 'accent')}
-      ${statCard('alert', all.filter(s => Q.attStats(s.id).pct < 80).length, 'Kehadiran < 80%', 'danger')}
+      ${statCard('users', active.length, 'Pelajar aktif', 'primary', off ? `${off} nonaktif` : '')}
+      ${statCard('book', active.filter(s => s.status === 'Kelas 12').length, 'Kelas 12', 'info')}
+      ${statCard('flag', active.filter(s => s.status === 'Gap Year').length, 'Alumni / gap year', 'accent')}
+      ${statCard('alert', active.filter(s => Q.attStats(s.id).total > 0 && Q.attStats(s.id).pct < 80).length, 'Kehadiran < 80%', 'danger')}
     </div>
     <div class="card">
       <div class="toolbar">
         <div class="search">${icon('search', 16)}<input class="input" id="pm-q" placeholder="Cari nama atau sekolah…" value="${esc(PelajarMgmt.q)}"></div>
         <select id="pm-grp" aria-label="Filter Kelompok Kelas"><option value="all">Semua Kelompok Kelas</option>${groups.map(g => `<option value="${g.id}" ${PelajarMgmt.grp === g.id ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select>
+        <div class="chips">${[['on', 'Aktif'], ['off', 'Nonaktif'], ['all', 'Semua']].map(([k, l]) => `<button class="chip ${PelajarMgmt.st === k ? 'active' : ''}" data-st="${k}">${l}<span class="cnt">${cnt(k)}</span></button>`).join('')}</div>
       </div>
       <div class="table-wrap"><table><thead><tr><th>Pelajar</th><th>Kelompok Kelas</th><th>Wali Kelas</th><th>Asal / status</th><th style="width:160px">Kehadiran</th><th>Nilai</th><th></th></tr></thead><tbody id="pm-body">${this.rows()}</tbody></table></div>
     </div>`;
   },
   rows() {
-    const q = PelajarMgmt.q.toLowerCase(), canPlace = Q.canPlace();
-    const list = Q.scopeStudents().filter(s => (PelajarMgmt.grp === 'all' || s.groupId === PelajarMgmt.grp) && (s.name.toLowerCase().includes(q) || s.school.toLowerCase().includes(q)));
+    const q = PelajarMgmt.q.toLowerCase(), canPlace = Q.canPlace(), stf = PelajarMgmt.st;
+    const list = this.pool().filter(s => (stf === 'all' || (stf === 'on' ? Q.isActive(s) : !Q.isActive(s))) && (PelajarMgmt.grp === 'all' || s.groupId === PelajarMgmt.grp) && (s.name.toLowerCase().includes(q) || s.school.toLowerCase().includes(q)));
     if (!list.length) return `<tr><td colspan="7">${emptyState('users', 'Pelajar tidak ditemukan', 'Coba kata kunci atau filter lain.')}</td></tr>`;
     return list.map(s => {
-      const pct = Q.attStats(s.id).pct, g = Q.grp(s.groupId);
-      return `<tr><td><div class="cell-user">${avatar(s.name, 'sm')}<div><b>${esc(s.name)}</b><small>${esc(s.email)}</small></div></div></td>
+      const pct = Q.attStats(s.id).pct, g = Q.grp(s.groupId), on = Q.isActive(s);
+      return `<tr class="${on ? '' : 'row-muted'}"><td><div class="cell-user">${avatar(s.name, 'sm')}<div><b>${esc(s.name)}</b>${on ? '' : ` ${badge('Nonaktif', 'neutral')}`}<small>${esc(s.email)}</small></div></div></td>
         <td>${tag(g)}</td>
         <td>${esc(g.wali)}</td>
         <td>${esc(s.school)}<div class="muted small">${s.status}</div></td>
         <td>${progRow(pct, toneByPct(pct))}</td>
         <td><b>${Q.taskAvg(s.id)}</b></td>
-        <td style="text-align:right;white-space:nowrap"><button class="btn btn-sm btn-ghost" data-detail="${s.id}">Detail</button>${canPlace ? ` <button class="btn btn-sm btn-ghost" data-edit="${s.id}" aria-label="Ubah ${esc(s.name)}">${icon('edit', 14)} Ubah</button> <button class="icon-btn" data-move="${s.id}" title="Pindahkan kelompok" aria-label="Pindahkan ${esc(s.name)}">${icon('swap', 16)}</button>` : ''}</td></tr>`;
+        <td style="text-align:right;white-space:nowrap"><button class="btn btn-sm btn-ghost" data-detail="${s.id}">Detail</button>${canPlace ? ` <button class="btn btn-sm btn-ghost" data-edit="${s.id}" aria-label="Ubah ${esc(s.name)}">${icon('edit', 14)} Ubah</button>${on ? ` <button class="icon-btn" data-move="${s.id}" title="Pindahkan kelompok" aria-label="Pindahkan ${esc(s.name)}">${icon('swap', 16)}</button>` : ''}` : ''}</td></tr>`;
     }).join('');
   },
   mount(root) {
     $('#pm-q', root).addEventListener('input', e => { PelajarMgmt.q = e.target.value; $('#pm-body', root).innerHTML = this.rows(); });
     $('#pm-grp', root).addEventListener('change', e => { PelajarMgmt.grp = e.target.value; $('#pm-body', root).innerHTML = this.rows(); });
     root.addEventListener('click', e => {
+      const st = e.target.closest('[data-st]'); if (st) { PelajarMgmt.st = st.dataset.st; return App.refresh(); }
       const d = e.target.closest('[data-detail]'); if (d) return studentDetailModal(d.dataset.detail);
       const ed = e.target.closest('[data-edit]'); if (ed) return this.formModal(ed.dataset.edit);
       const mv = e.target.closest('[data-move]'); if (mv) return Shared.moveStudentModal(mv.dataset.move);
@@ -150,8 +175,9 @@ PanitiaPages.pelajar = {
   },
   formModal(id) {
     const s = id ? Q.student(id) : null;
+    const isDemo = s && DB.accounts.some(a => a.studentId === s.id);
     openModal({
-      title: s ? 'Ubah data pelajar' : 'Tambah pelajar', sub: s ? s.name : 'Akun pelajar baru menerima email undangan untuk mengatur kata sandi.',
+      title: s ? 'Ubah data pelajar' : 'Tambah pelajar', sub: s ? s.name : 'Kata sandi awal dibuat otomatis. Berikan ke pelajar; pelajar dapat menggantinya setelah masuk.',
       body: `<div class="form-grid two">
         <label class="field span-2"><span>Nama lengkap</span><input id="ap-name" value="${s ? esc(s.name) : ''}"><small class="field-err"></small></label>
         <label class="field"><span>Email</span><input id="ap-email" type="email" placeholder="nama@email.com" value="${s ? esc(s.email) : ''}"><small class="field-err"></small></label>
@@ -159,13 +185,27 @@ PanitiaPages.pelajar = {
         <label class="field"><span>Asal sekolah</span><input id="ap-school" value="${s ? esc(s.school) : ''}"></label>
         <label class="field"><span>Status</span><select id="ap-status">${['Kelas 12', 'Gap Year'].map(v => `<option ${s && s.status === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
         <label class="field span-2"><span>Kelompok Kelas</span><select id="ap-grp">${DB.groups.map(g => `<option value="${g.id}" ${s && s.groupId === g.id ? 'selected' : ''}>${esc(g.name)} — Wali: ${esc(g.wali)} · ${Q.studentsOf(g.id).length} pelajar</option>`).join('')}</select></label>
+        ${s ? `<div class="field span-2"><span>Status akun</span><div class="setting-row" style="padding:6px 0;border:0"><div><b id="ap-act-label">${Q.isActive(s) ? 'Aktif' : 'Nonaktif'}</b><small>Pelajar nonaktif tidak dihitung di kelompok, presensi, dan tugas, serta tidak dapat masuk.</small></div><label class="switch"><input type="checkbox" id="ap-active" ${Q.isActive(s) ? 'checked' : ''}><span></span></label></div></div>`
+        : `<div class="field span-2"><span>Kata sandi awal</span><div class="pw-gen"><input id="ap-pw" readonly value="${genPassword()}" aria-label="Kata sandi awal"><button type="button" class="btn btn-ghost" id="ap-regen" title="Buat ulang">${icon('refresh', 16)} Generate</button><button type="button" class="btn btn-ghost" id="ap-copy" title="Salin">${icon('clip', 16)} Salin</button></div><small class="muted small">Dibuat acak 10 karakter. Simpan dan berikan ke pelajar.</small></div>`}
       </div>
       <div class="note primary" id="ap-note">${icon('alert', 15)}<span>Satu pelajar hanya dapat terdaftar di satu Kelompok Kelas.</span></div>`,
-      footer: `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="ap-save">${icon('check', 16)} Simpan pelajar</button>`,
-      onMount(m) {
-        if (s) $('#ap-grp', m).addEventListener('change', e => {
-          $('#ap-note span', m).innerHTML = e.target.value === s.groupId ? 'Satu pelajar hanya dapat terdaftar di satu Kelompok Kelas.' : `Pelajar akan <b>dipindahkan</b> dari ${esc(Q.grp(s.groupId).name)} ke ${esc(Q.grp(e.target.value).name)}.`;
-        });
+      footer: `${s ? `<button class="btn btn-danger foot-left" id="ap-del">${icon('x', 16)} Hapus pelajar</button>` : ''}<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="ap-save">${icon('check', 16)} Simpan pelajar</button>`,
+      onMount: m => {
+        if (s) {
+          $('#ap-grp', m).addEventListener('change', e => {
+            $('#ap-note span', m).innerHTML = e.target.value === s.groupId ? 'Satu pelajar hanya dapat terdaftar di satu Kelompok Kelas.' : `Pelajar akan <b>dipindahkan</b> dari ${esc(Q.grp(s.groupId).name)} ke ${esc(Q.grp(e.target.value).name)}.`;
+          });
+          $('#ap-active', m).addEventListener('change', e => { $('#ap-act-label', m).textContent = e.target.checked ? 'Aktif' : 'Nonaktif'; });
+          $('#ap-del', m).addEventListener('click', () => this.deleteModal(s, isDemo));
+        } else {
+          $('#ap-regen', m).addEventListener('click', () => { $('#ap-pw', m).value = genPassword(); });
+          $('#ap-copy', m).addEventListener('click', () => {
+            const pw = $('#ap-pw', m).value;
+            const done = () => toast('Kata sandi disalin.', 'info');
+            if (navigator.clipboard) navigator.clipboard.writeText(pw).then(done, () => { $('#ap-pw', m).select(); toast('Salin manual: teks sudah dipilih.', 'info'); });
+            else { $('#ap-pw', m).select(); toast('Salin manual: teks sudah dipilih.', 'info'); }
+          });
+        }
         $('#ap-save', m).addEventListener('click', () => {
           const name = $('#ap-name', m).value.trim(), email = $('#ap-email', m).value.trim();
           fieldErr($('#ap-name', m), name ? '' : 'Nama wajib diisi.');
@@ -174,14 +214,39 @@ PanitiaPages.pelajar = {
           const data = { name, email, phone: $('#ap-phone', m).value || '-', school: $('#ap-school', m).value || '-', status: $('#ap-status', m).value, groupId: $('#ap-grp', m).value };
           if (s) {
             const moved = s.groupId !== data.groupId, from = Q.grp(s.groupId).name;
-            Object.assign(s, data);
+            const wasOn = Q.isActive(s), on = $('#ap-active', m).checked;
+            Object.assign(s, data, { active: on });
             if (moved) DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Memindahkan ${name}: ${from} → ${Q.grp(data.groupId).name}` });
-            closeModal(); toast(moved ? `Data disimpan & ${esc(name)} dipindah ke ${esc(Q.grp(data.groupId).name)}.` : 'Data pelajar diperbarui.');
+            if (wasOn !== on) DB.audit.unshift({ who: App.user.name, at: stamp(), what: `${on ? 'Mengaktifkan' : 'Menonaktifkan'} akun pelajar ${name}` });
+            closeModal();
+            toast(wasOn !== on ? `Akun ${esc(name)} ${on ? 'diaktifkan kembali' : 'dinonaktifkan'}.` : moved ? `Data disimpan & ${esc(name)} dipindah ke ${esc(Q.grp(data.groupId).name)}.` : 'Data pelajar diperbarui.', wasOn !== on && !on ? 'warning' : 'success');
           } else {
-            DB.students.push({ id: 'p' + Date.now(), ...data, joined: todayStr(), att: 100, avg: 0, toHist: [0, 0, 0, 0] });
-            closeModal(); toast(`${esc(name)} ditambahkan ke ${esc(Q.grp(data.groupId).name)} & undangan dikirim.`);
+            const pw = $('#ap-pw', m).value;
+            // Pelajar baru belum punya riwayat presensi: att null → kehadiran 0%
+            DB.students.push({ id: 'p' + Date.now(), ...data, active: true, joined: todayStr(), att: null, avg: 0, toHist: [0, 0, 0, 0] });
+            DB.activity.unshift({ who: App.user.name, what: 'menambahkan pelajar ke', obj: Q.grp(data.groupId).name, at: stamp(), icon: 'users' });
+            closeModal(); toast(`${esc(name)} ditambahkan ke ${esc(Q.grp(data.groupId).name)}. Kata sandi awal: <b>${esc(pw)}</b>`);
           }
           App.refresh();
+        });
+      },
+    });
+  },
+  deleteModal(s, isDemo) {
+    if (isDemo) return toast(`${esc(s.name)} adalah akun demo dan tidak dapat dihapus. Nonaktifkan saja bila perlu.`, 'error');
+    openModal({
+      title: 'Hapus pelajar?', sub: s.name,
+      body: `<div class="alert alert-danger">${icon('alert', 16)}<span>Akun, riwayat presensi, pengajuan izin, dan koreksi presensi <b>${esc(s.name)}</b> akan dihapus permanen. Bila hanya ingin menghentikan sementara, gunakan <b>Nonaktifkan</b>.</span></div>`,
+      footer: `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-danger" id="del-ok">${icon('x', 16)} Ya, hapus</button>`,
+      onMount(m) {
+        $('#del-ok', m).addEventListener('click', () => {
+          const rm = (arr, f) => { for (let i = arr.length - 1; i >= 0; i--) if (f(arr[i])) arr.splice(i, 1); };
+          rm(DB.students, x => x.id === s.id);
+          rm(DB.leaves, x => x.studentId === s.id);
+          rm(DB.corrections, x => x.studentId === s.id);
+          delete DB.attendance[s.id];
+          DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Menghapus akun pelajar ${s.name}` });
+          closeModal(); toast(`${esc(s.name)} dihapus.`, 'info'); App.refresh();
         });
       },
     });
@@ -276,7 +341,7 @@ const KelompokPage = {
       <span>${icon('user', 14)} 1 kelompok = 1 Wali Kelas</span>
       <span>${icon('layers', 14)} Wali Kelas boleh memegang beberapa kelompok</span>
       <span>${icon('shield', 14)} Tutor tidak merangkap Wali Kelas</span>
-      <span>${icon('pin', 14)} Seluruh sesi luring</span>
+      <span>${icon('book', 14)} Tutor pengampu diatur per Mata Pelajaran</span>
     </div>
     <div class="stats">
       ${statCard('layers', groups.length, 'Kelompok Kelas', 'primary')}
@@ -288,13 +353,13 @@ const KelompokPage = {
       const n = Q.studentsOf(g.id).length, next = Q.nextSession([g.id]), subs = Q.subjectsOfGroup(g.id);
       const role = [Q.teachesGroup(g) ? 'Tutor' : '', g.wali === App.user.name ? 'Wali Kelas' : ''].filter(Boolean).join(' · ');
       return `<a class="class-card" href="#/kelas/${g.id}" style="--c:${g.color}">
-        <div class="class-cover"><span class="badge no-dot">${esc(g.program)}</span><h3>${esc(g.name)}</h3><p>${esc(g.room)}</p></div>
+        <div class="class-cover"><h3>${esc(g.name)}</h3><p>${esc(g.desc)}</p></div>
         <div class="class-body">
           <div class="class-people"><div class="person">${avatar(g.wali, 'sm')}<div><small>Wali Kelas</small><b>${esc(g.wali)}</b></div></div></div>
           <div class="row wrap" style="gap:6px">${subs.map(stag).join('') || '<span class="muted small">Belum ada mapel terjadwal</span>'}</div>
           ${next ? `<div class="meta-row"><span>${icon('calendar', 14)} ${relDay(next.date)}, ${next.start}</span><span>${icon('book', 14)} ${esc(Q.subj(next.subjectId).code)} · ${esc(next.topic)}</span></div>` : ''}
           ${role ? `<div>${badge('Peranmu: ' + role, 'primary', 'no-dot')}</div>` : ''}
-          <div class="class-foot"><span>${icon('users', 14)} ${n} pelajar</span><span>${icon('book', 14)} ${subs.length} mapel</span><span>${icon('pin', 14)} Luring</span></div>
+          <div class="class-foot"><span>${icon('users', 14)} ${n} pelajar</span><span>${icon('book', 14)} ${subs.length} mapel</span><span>${icon('calendar', 14)} ${Q.sessionsOf([g.id]).filter(Q.isUpcoming).length} sesi mendatang</span></div>
         </div>
       </a>`;
     }).join('')}</div>` : `<div class="card">${emptyState('layers', 'Belum ada Kelompok Kelas', 'Kelompok akan muncul setelah kamu ditugaskan oleh Kurikulum.')}</div>`}
@@ -360,13 +425,21 @@ const MapelPage = {
     const s = id ? Q.subj(id) : null;
     const colors = ['#34d399', '#8b7bff', '#60a5fa', '#ffb547', '#f472b6', '#22d3ee', '#a3e635', '#fb923c'];
     openModal({
-      title: s ? 'Ubah Mata Pelajaran' : 'Tambah Mata Pelajaran',
+      title: s ? 'Ubah Mata Pelajaran' : 'Tambah Mata Pelajaran', size: 'lg',
       body: `<div class="form-grid two">
         <label class="field span-2"><span>Nama mata pelajaran</span><input id="sf-name" value="${s ? esc(s.name) : ''}" placeholder="cth. Penalaran Umum"><small class="field-err"></small></label>
         <label class="field"><span>Kode</span><input id="sf-code" value="${s ? esc(s.code) : ''}" placeholder="cth. PU" maxlength="6" style="text-transform:uppercase"><small class="field-err"></small></label>
         <div class="field"><span>Status</span><div class="setting-row" style="padding:6px 0;border:0"><div><b id="sf-st-label">${!s || s.active ? 'Aktif' : 'Nonaktif'}</b><small>Mapel aktif dapat dijadwalkan</small></div><label class="switch"><input type="checkbox" id="sf-active" ${!s || s.active ? 'checked' : ''}><span></span></label></div></div>
         <label class="field span-2"><span>Deskripsi singkat</span><textarea id="sf-desc" maxlength="160" placeholder="Cakupan materi secara singkat…" style="min-height:80px">${s ? esc(s.desc) : ''}</textarea><small class="muted small" style="text-align:right"><span id="sf-count">${s ? s.desc.length : 0}</span>/160</small></label>
-      </div>`,
+        <div class="field span-2"><span>Tutor pengampu</span>
+          <div class="check-grid" id="sf-tutors">${Q.tutors().map(t => {
+            const others = t.subjects.filter(x => x !== (s && s.id)).map(x => Q.subj(x)).filter(Boolean).map(x => x.code);
+            return `<label class="check-chip"><input type="checkbox" value="${t.id}" ${s && t.subjects.includes(s.id) ? 'checked' : ''}><span><b>${esc(t.name)}</b><small>${others.length ? 'Juga mengampu ' + others.map(esc).join(', ') : 'Belum mengampu mapel lain'}</small></span></label>`;
+          }).join('') || '<p class="muted small">Belum ada akun tutor. Tambahkan di Pengguna & Peran.</p>'}</div>
+          <small class="muted small">Hanya tutor yang dicentang yang dapat dipilih saat membuat jadwal sesi mapel ini.</small>
+        </div>
+      </div>
+      <div id="sf-warn"></div>`,
       footer: `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="sf-save">${icon('check', 16)} Simpan mapel</button>`,
       onMount(m) {
         $('#sf-desc', m).addEventListener('input', e => { $('#sf-count', m).textContent = e.target.value.length; });
@@ -378,9 +451,24 @@ const MapelPage = {
           fieldErr($('#sf-code', m), !/^[A-Z0-9]{2,6}$/.test(code) ? 'Kode 2–6 huruf/angka.' : dup ? 'Kode sudah dipakai mapel lain.' : '');
           if (!name || !/^[A-Z0-9]{2,6}$/.test(code) || dup) return;
           const data = { name, code, desc: $('#sf-desc', m).value.trim() || '-', active: $('#sf-active', m).checked };
-          if (s) Object.assign(s, data);
-          else DB.subjects.push({ id: 'sb' + Date.now(), color: colors[DB.subjects.length % colors.length], topics: [], ...data });
-          closeModal(); toast(s ? 'Mata pelajaran diperbarui.' : `Mapel ${esc(code)} ditambahkan.`); App.refresh();
+          const picked = $$('#sf-tutors input:checked', m).map(i => i.value);
+          // Tutor yang dilepas tidak boleh masih punya sesi mendatang untuk mapel ini
+          if (s) {
+            const blocked = Q.tutors().filter(t => t.subjects.includes(s.id) && !picked.includes(t.id))
+              .map(t => ({ t, n: DB.sessions.filter(x => x.subjectId === s.id && x.tutor === t.name && Q.isUpcoming(x)).length })).filter(x => x.n);
+            if (blocked.length) {
+              $('#sf-warn', m).innerHTML = `<div class="alert alert-danger">${icon('alert', 16)}<span>${blocked.map(x => `<b>${esc(x.t.name)}</b> masih dijadwalkan ${x.n} sesi mendatang ${esc(s.code)}`).join('; ')}. Alihkan sesi tersebut di Manajemen Jadwal terlebih dahulu.</span></div>`;
+              return;
+            }
+          }
+          const subj = s ? Object.assign(s, data) : { id: 'sb' + Date.now(), color: colors[DB.subjects.length % colors.length], topics: [], ...data };
+          if (!s) DB.subjects.push(subj);
+          Q.tutors().forEach(t => {
+            const has = t.subjects.includes(subj.id), want = picked.includes(t.id);
+            if (want && !has) t.subjects.push(subj.id);
+            if (!want && has) t.subjects = t.subjects.filter(x => x !== subj.id);
+          });
+          closeModal(); toast(s ? 'Mata pelajaran diperbarui.' : `Mapel ${esc(code)} ditambahkan${picked.length ? ` dengan ${picked.length} tutor pengampu` : ''}.`); App.refresh();
         });
       },
     });
@@ -662,7 +750,7 @@ PanitiaPages.presensi = {
           </div>
           <div class="kv" style="margin-bottom:16px">
             <div><span>Kelompok Kelas</span><b>${esc(Q.grp(s.groupId).name)} · ${Q.studentsOf(s.groupId).length} pelajar</b></div>
-            <div><span>Batas tepat waktu</span><b>${DB.addMin(s.start, Q.grp(s.groupId).late)} WIB (${Q.grp(s.groupId).late} menit)</b></div>
+            <div><span>Batas tepat waktu</span><b>${DB.addMin(s.start, DB.settings.lateTolerance)} WIB (${DB.settings.lateTolerance} menit)</b></div>
             <div><span>QR diperbarui setiap</span><b>${DB.settings.qrRefresh} detik</b></div>
             <div><span>Tempat</span><b>${esc(s.location)}</b></div>
           </div>
@@ -940,7 +1028,7 @@ PanitiaPages.laporan = {
     openModal({
       title: 'Input hasil tryout eksternal', sub: 'BAT tidak menyelenggarakan tryout di aplikasi; hasil dari platform eksternal diinput di sini.', size: 'lg',
       body: `<div class="form-grid two">
-        <label class="field"><span>Pelajar</span><select id="to-st">${DB.students.map(s => `<option value="${s.id}">${esc(s.name)} · ${esc(Q.grp(s.groupId).name)}</option>`).join('')}</select></label>
+        <label class="field"><span>Pelajar</span><select id="to-st">${Q.activeStudents().map(s => `<option value="${s.id}">${esc(s.name)} · ${esc(Q.grp(s.groupId).name)}</option>`).join('')}</select></label>
         <label class="field"><span>Nama tryout</span><input id="to-name" value="Tryout Eksternal #5"></label>
         <label class="field"><span>Platform penyelenggara</span><input id="to-plat" placeholder="cth. Mitra TO Nasional"></label>
         <label class="field"><span>Tanggal</span><input type="date" id="to-date" value="${todayStr()}"></label>
@@ -1090,7 +1178,7 @@ PanitiaPages.pengaturan = {
         <div class="card">
           <div class="card-head"><h3>${icon('qr', 16)} Pengaturan presensi</h3>${canSys ? '' : badge('Hanya Kurikulum/Admin', 'neutral', 'no-dot')}</div>
           <div class="form-grid">
-            <label class="field"><span>Toleransi keterlambatan default (menit)</span><input type="number" id="st-late" value="${DB.settings.lateTolerance}" min="0" max="60" ${canSys ? '' : 'disabled'}></label>
+            <label class="field"><span>Toleransi keterlambatan (menit)</span><input type="number" id="st-late" value="${DB.settings.lateTolerance}" min="0" max="60" ${canSys ? '' : 'disabled'}></label>
             <label class="field"><span>QR Code diperbarui setiap (detik)</span><input type="number" id="st-qr" value="${DB.settings.qrRefresh}" min="10" max="120" ${canSys ? '' : 'disabled'}></label>
             <label class="field"><span>Batas pengajuan izin</span><select id="st-izin" ${canSys ? '' : 'disabled'}>${['H-0', 'H-1', 'H-2'].map(v => `<option ${DB.settings.leaveDeadline === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
             <label class="field"><span>Batas pengajuan koreksi presensi (hari)</span><input type="number" id="st-corr" value="${DB.settings.correctionWindow}" min="1" max="7" ${canSys ? '' : 'disabled'}></label>

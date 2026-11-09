@@ -82,13 +82,13 @@ const DB = (() => {
 
   /* ---------- Kelompok Kelas ---------- */
   const groups = [
-    { id: 'g1', name: 'Saintek A', program: 'SNBT Saintek', color: '#8b7bff', wali: 'Fajar Nugroho', room: 'Ruang 2 · Sekretariat BAT', late: 15,
+    { id: 'g1', name: 'Saintek A', color: '#8b7bff', wali: 'Fajar Nugroho',
       desc: 'Kelompok persiapan SNBT Saintek dengan fokus Pengetahuan Kuantitatif, Penalaran Matematika, dan Penalaran Umum.' },
-    { id: 'g2', name: 'Saintek B', program: 'SNBT Saintek', color: '#22d3ee', wali: 'Fajar Nugroho', room: 'Ruang 3 · Sekretariat BAT', late: 15,
+    { id: 'g2', name: 'Saintek B', color: '#22d3ee', wali: 'Fajar Nugroho',
       desc: 'Kelompok paralel Saintek dengan tambahan Literasi Bahasa Inggris.' },
-    { id: 'g3', name: 'Soshum A', program: 'SNBT Soshum', color: '#ffb547', wali: 'Wulan Sari', room: 'Ruang 1 · Sekretariat BAT', late: 15,
+    { id: 'g3', name: 'Soshum A', color: '#ffb547', wali: 'Wulan Sari',
       desc: 'Kelompok persiapan SNBT Soshum: literasi, pemahaman bacaan, dan pengetahuan umum.' },
-    { id: 'g4', name: 'Gap Year', program: 'Alumni / Gap Year', color: '#f472b6', wali: 'Wulan Sari', room: 'Aula Perpustakaan Kota', late: 15,
+    { id: 'g4', name: 'Gap Year', color: '#f472b6', wali: 'Wulan Sari',
       desc: 'Kelompok untuk alumni dan pejuang gap year dengan ritme intensif di pagi hari.' },
   ];
 
@@ -122,7 +122,7 @@ const DB = (() => {
   const students = rawStudents.map(([id, name, groupId, school, status]) => {
     const base = ri(470, 560);
     return {
-      id, name, groupId, school, status,
+      id, name, groupId, school, status, active: true,
       email: name.split(' ')[0].toLowerCase() + '@bat.id',
       phone: '08' + ri(1100000000, 1999999999),
       joined: D(-ri(60, 120)),
@@ -151,7 +151,9 @@ const DB = (() => {
   const sessions = [];
   const topicIdx = {};
   let sid = 1;
-  const gRoom = gid => groups.find(g => g.id === gid).room;
+  // Tempat default sesi dummy per kelompok (tempat kini melekat pada sesi, bukan kelompok)
+  const rooms = { g1: 'Ruang 2 · Sekretariat BAT', g2: 'Ruang 3 · Sekretariat BAT', g3: 'Ruang 1 · Sekretariat BAT', g4: 'Aula Perpustakaan Kota' };
+  const gRoom = gid => rooms[gid];
   const subjTopics = id => subjects.find(s => s.id === id).topics;
   for (let off = -28; off <= 20; off++) {
     const date = D(off);

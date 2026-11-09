@@ -815,3 +815,22 @@ tr.row-muted td { opacity: .6; }
 /* Penilaian per kelompok */
 .grade-group + .grade-group { border-top: 1px solid var(--border-soft); margin-top: 8px; }
 .time-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* Jadwal yang sudah lewat diredupkan agar sesi mendatang lebih menonjol */
+.agenda-item.is-past { opacity: .42; filter: saturate(.25); transition: opacity .15s, filter .15s; }
+.agenda-item.is-past:hover { opacity: .7; filter: saturate(.6); }
+.day.past:not(.active) { opacity: .45; }
+.day.past:not(.active):hover { opacity: .75; }
+
+/* Pelajar kehadiran terendah */
+.low-rank { display: flex; flex-direction: column; gap: 14px; }
+.low-rank .lr-item { display: flex; align-items: center; gap: 12px; }
+.low-rank .lr-no { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-weight: 800; font-size: 12px; background: rgba(248, 113, 113, .14); color: var(--danger); flex-shrink: 0; }
+.low-rank .lr-body { flex: 1; min-width: 0; }
+.low-rank .lr-body b { display: block; font-size: 13.5px; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Kata sandi awal pelajar */
+.pw-gen { display: flex; gap: 8px; }
+.pw-gen input { flex: 1; font-family: ui-monospace, Consolas, monospace; letter-spacing: .06em; }
+.modal-foot .foot-left { margin-right: auto; }
+.class-cover p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

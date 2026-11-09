@@ -117,6 +117,12 @@ const LoginPage = {
           showAlert('Email atau kata sandi salah. Periksa kembali atau gunakan akun demo di bawah.');
           return;
         }
+        const st = acc.studentId && Q.student(acc.studentId);
+        if (acc.studentId && (!st || !Q.isActive(st))) {
+          btn.classList.remove('loading'); btn.textContent = 'Masuk';
+          showAlert('Akun pelajar ini sedang dinonaktifkan. Hubungi Kurikulum BAT.');
+          return;
+        }
         login(acc);
       }, 650);
     });

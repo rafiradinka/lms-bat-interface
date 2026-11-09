@@ -272,7 +272,7 @@ PelajarPages.presensi = {
     }
     const rec = Q.attOf(me.id);
     const s = Q.session(PresensiPel.sel), g = Q.grp(s.groupId), sb = Q.subj(s.subjectId), done = rec[s.id];
-    const deadline = DB.addMin(s.start, g.late);
+    const deadline = DB.addMin(s.start, DB.settings.lateTolerance);
     return `
       <div class="card-head"><h3>Pilih sesi aktif</h3>${badge(fmtDate(todayStr(), { weekday: 'long', day: 'numeric', month: 'short' }), 'neutral', 'no-dot')}</div>
       <div class="session-pick">
@@ -294,7 +294,7 @@ PelajarPages.presensi = {
           <button class="btn btn-ghost" id="cam-btn">${icon('camera', 16)} Aktifkan kamera</button>
           <button class="btn btn-primary" id="scan-btn">${icon('scan', 16)} Pindai QR (simulasi)</button>
         </div>
-        <div class="note info" style="justify-content:center">${icon('clock', 15)}<span>Batas tepat waktu pukul <b>${deadline}</b> WIB (toleransi ${g.late} menit). Lewat dari itu tercatat <b>Terlambat</b>.</span></div>`}
+        <div class="note info" style="justify-content:center">${icon('clock', 15)}<span>Batas tepat waktu pukul <b>${deadline}</b> WIB (toleransi ${DB.settings.lateTolerance} menit). Lewat dari itu tercatat <b>Terlambat</b>.</span></div>`}
     `;
   },
   history(me) {
@@ -348,7 +348,7 @@ PelajarPages.presensi = {
     $('#scan-btn', root).classList.add('loading');
     setTimeout(() => {
       const t = nowHM();
-      const status = toMin(t) <= toMin(s.start) + g.late ? 'hadir' : 'terlambat';
+      const status = toMin(t) <= toMin(s.start) + DB.settings.lateTolerance ? 'hadir' : 'terlambat';
       Q.attOf(me.id)[s.id] = { status, time: t };
       DB.audit.unshift({ who: me.name, at: stamp(), what: `Presensi QR ${g.name} · ${sb.code} (${s.topic}) → ${ATT[status].label}` });
       this.stopCam();
