@@ -445,10 +445,14 @@ function attSummary(st, size = 150) {
   return `<div class="donut-wrap">${donut(segs, { size, label: st.pct + '%', sub: 'kehadiran' })}${legend(segs)}</div>`;
 }
 
+/* Tautan ke Room Pertemuan asal materi/tugas */
+const meetLink = sid => { const s = sid && Q.session(sid); return s ? ` · <a href="#/sesi/${s.id}" style="color:var(--primary);font-weight:700">Pertemuan ${fmtShort(s.date)}</a>` : ''; };
+
 /* Baris sesi ringkas (dipakai di banyak halaman) */
 const sessRow = (s, opts = {}) => {
   const st = Q.state(s), sb = Q.subj(s.subjectId), g = Q.grp(s.groupId);
-  return `<div class="item"><div class="item-ic" style="--c:${sb.color}">${icon('calendar', 18)}</div><div class="item-body"><div class="item-title">${esc(s.topic)}</div><div class="item-sub">${opts.showGroup ? esc(g.name) + ' · ' : ''}${esc(sb.code)} · ${fmtDay(s.date)} · ${s.start}–${s.end} · ${esc(s.tutor)}</div></div><div class="item-side">${s.changed ? badge('Berubah', 'warning') : ''}${badge(st.label, st.tone)}</div></div>`;
+  // Setiap sesi = Room Pertemuan; sesi lampau terbuka sebagai arsip
+  return `<a class="item clickable" href="#/sesi/${s.id}"><div class="item-ic" style="--c:${sb.color}">${icon('calendar', 18)}</div><div class="item-body"><div class="item-title">${esc(s.topic)}</div><div class="item-sub">${opts.showGroup ? esc(g.name) + ' · ' : ''}${esc(sb.code)} · ${fmtDay(s.date)} · ${s.start}–${s.end} · ${esc(s.tutor)}</div></div><div class="item-side">${s.changed ? badge('Berubah', 'warning') : ''}${badge(st.key === 'selesai' ? 'Arsip' : st.label, st.tone)}</div></a>`;
 };
 
 /* ---------- Modal koreksi presensi (pelajar) ---------- */
@@ -769,10 +773,13 @@ Shared.jadwal = isPanitia => ({
                 <h4>${esc(s.topic)}</h4>
                 <div class="meta-row"><span>${icon('book', 14)} ${esc(sb.name)}</span><span>${icon('pin', 14)} ${esc(s.location)}</span><span>${icon('user', 14)} ${esc(s.tutor)}</span></div>
                 ${s.changed ? `<div class="note warning">${icon('alert', 15)} <span>${esc(s.changed)}</span></div>` : ''}
-                ${st.key !== 'selesai' && (canEdit || (!isPanitia && s.date === todayStr())) ? `<div class="agenda-actions">
-                  ${!isPanitia ? `<a class="btn btn-sm btn-primary" href="#/presensi">${icon('scan', 14)} Presensi</a><a class="btn btn-sm btn-ghost" href="#/izin">Ajukan izin</a>` : ''}
-                  ${canEdit ? `<button class="btn btn-sm btn-ghost" data-edit="${s.id}">${icon('edit', 14)} Ubah sesi</button>` : ''}
-                </div>` : ''}
+                <div class="agenda-actions">
+                  ${st.key === 'selesai' ? `<a class="btn btn-sm btn-ghost" href="#/sesi/${s.id}">${icon('history', 14)} Buka arsip pertemuan</a>`
+                    : s.date === todayStr() ? `<a class="btn btn-sm btn-primary" href="#/sesi/${s.id}">${icon('arrowRight', 14)} Masuk Kelas</a>`
+                    : `<a class="btn btn-sm btn-ghost" href="#/sesi/${s.id}">${icon('eye', 14)} Lihat room</a>`}
+                  ${!isPanitia && st.key !== 'selesai' ? `<a class="btn btn-sm btn-ghost" href="#/izin">Ajukan izin</a>` : ''}
+                  ${canEdit && st.key !== 'selesai' ? `<button class="btn btn-sm btn-ghost" data-edit="${s.id}">${icon('edit', 14)} Ubah sesi</button>` : ''}
+                </div>
               </div>
             </div>`;
           }).join('') : emptyState('calendar', 'Tidak ada sesi', 'Tidak ada sesi pada hari ini. Pilih hari lain di atas.', canEdit ? `<button class="btn btn-sm btn-primary" data-act="add-sess">${icon('plus', 14)} Tambah sesi di tanggal ini</button>` : '')}
@@ -904,7 +911,7 @@ Shared.sessionModal = sessionId => {
         } else {
           DB.sessions.push({ id: 's' + Date.now(), ...data, changed: null });
           DB.activity.unshift({ who: App.user.name, what: 'menambahkan sesi', obj: `${Q.grp(data.groupId).name} · ${Q.subj(data.subjectId).code}`, at: stamp(), icon: 'calendar' });
-          toast(`Sesi ditambahkan ke jadwal ${esc(Q.grp(data.groupId).name)}.`);
+          toast(`Sesi ditambahkan ke jadwal ${esc(Q.grp(data.groupId).name)}. Room pertemuan otomatis dibuat.`);
         }
         DB.sortSessions();
         JadwalState.sel = data.date;

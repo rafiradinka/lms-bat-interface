@@ -28,10 +28,9 @@ PelajarPages.beranda = {
         <h2>${esc(next.topic)}</h2>
         <div class="meta-row"><span>${icon('book', 15)} ${esc(sb.name)}</span><span>${icon('clock', 15)} ${fmtDay(next.date)} · ${next.start}–${next.end} WIB</span><span>${icon('pin', 15)} ${esc(next.location)}</span><span>${icon('user', 15)} ${esc(next.tutor)}</span></div>
         <div class="hero-actions">
-          ${done ? `<span class="btn btn-success" style="pointer-events:none">${icon('checkCircle', 16)} Sudah presensi · ${ATT[done.status].label}</span>`
-          : next.date === todayStr() ? `<a class="btn btn-primary btn-lg" href="#/presensi">${icon('scan', 18)} Presensi sekarang</a>`
-          : `<button class="btn btn-primary" disabled title="Presensi dibuka saat sesi berlangsung">${icon('scan', 16)} Presensi dibuka ${relDay(next.date).toLowerCase()}</button>`}
-          <a class="btn btn-ghost" href="#/kelas">Kelompok Kelas</a>
+          ${next.date === todayStr() ? `<a class="btn btn-primary btn-lg" href="#/sesi/${next.id}">${icon('arrowRight', 18)} Masuk Kelas</a>`
+          : `<a class="btn btn-primary" href="#/sesi/${next.id}">${icon('eye', 16)} Lihat room pertemuan</a>`}
+          ${done ? `<span class="btn btn-success" style="pointer-events:none">${icon('checkCircle', 16)} Sudah presensi · ${ATT[done.status].label}</span>` : ''}
           <a class="btn btn-outline" href="#/izin">Tidak bisa hadir?</a>
         </div>
       </section>`;
@@ -151,7 +150,7 @@ PelajarPages.tugas = {
         <div id="task-list">${this.list(sid)}</div>
       </div>
       <div class="tab-pane ${tabCls('ptugas', 'materi')}" data-pane="materi">
-        <div class="card"><div class="list">${mats.map(m => `<div class="item"><div class="item-ic" style="--c:${MAT_COLOR[m.type]}">${icon(MAT_ICON[m.type], 18)}</div><div class="item-body"><div class="item-title">${esc(m.title)}</div><div class="item-sub">${m.type} · ${m.size} · ${esc(m.by)} · ${fmtShort(m.date)}</div></div><button class="btn btn-sm btn-ghost" data-dl="${esc(m.title)}">${icon(m.type === 'Link' ? 'link' : 'download', 14)} ${m.type === 'Link' ? 'Buka' : 'Unduh'}</button></div>`).join('') || emptyState('book', 'Belum ada materi')}</div></div>
+        <div class="card"><div class="list">${mats.map(m => `<div class="item"><div class="item-ic" style="--c:${MAT_COLOR[m.type]}">${icon(MAT_ICON[m.type], 18)}</div><div class="item-body"><div class="item-title">${esc(m.title)}</div><div class="item-sub">${m.type} · ${m.size} · ${esc(m.by)} · ${fmtShort(m.date)}${meetLink(m.sessionId)}</div></div><button class="btn btn-sm btn-ghost" data-dl="${esc(m.title)}">${icon(m.type === 'Link' ? 'link' : 'download', 14)} ${m.type === 'Link' ? 'Buka' : 'Unduh'}</button></div>`).join('') || emptyState('book', 'Belum ada materi')}</div></div>
       </div>
     </div>`;
   },
@@ -164,14 +163,14 @@ PelajarPages.tugas = {
       const overdue = a.my.status === 'belum' && dd < 0;
       return `<div class="task">
         <div class="task-main">
-          <div class="task-top">${stag(Q.subj(a.subjectId))}${badge(m.label, m.tone)}${a.my.status === 'belum' && dd <= 1 && dd >= 0 ? badge('Segera', 'danger') : ''}</div>
+          <div class="task-top">${stag(Q.subj(a.subjectId))}${a.kind === 'kuis' ? badge('Kuis', 'accent', 'no-dot') : ''}${badge(m.label, m.tone)}${a.my.status === 'belum' && dd <= 1 && dd >= 0 ? badge('Segera', 'danger') : ''}</div>
           <h4>${esc(a.title)}</h4>
           <p>${esc(a.desc)}</p>
-          <div class="meta-row"><span>${icon('clock', 14)} Tenggat ${fmtDay(a.deadline)}, ${a.time}</span>${a.my.status === 'belum' ? `<span class="${overdue ? 'text-danger' : ''}">${relDay(a.deadline)}</span>` : a.my.submittedAt ? `<span>${icon('upload', 14)} Dikumpul ${fmtStamp(a.my.submittedAt)}</span>` : ''}<span>${icon('user', 14)} ${esc(a.by)}</span></div>
+          <div class="meta-row"><span>${icon('clock', 14)} Tenggat ${fmtDay(a.deadline)}, ${a.time}</span>${a.my.status === 'belum' ? `<span class="${overdue ? 'text-danger' : ''}">${relDay(a.deadline)}</span>` : a.my.submittedAt ? `<span>${icon('upload', 14)} Dikumpul ${fmtStamp(a.my.submittedAt)}</span>` : ''}<span>${icon('user', 14)} ${esc(a.by)}</span>${a.sessionId && Q.session(a.sessionId) ? `<a href="#/sesi/${a.sessionId}" style="color:var(--primary);font-weight:700">${icon('layers', 14)} Pertemuan ${fmtShort(Q.session(a.sessionId).date)}</a>` : ''}</div>
         </div>
         <div class="task-side">
           ${a.my.status === 'dinilai' ? `<div class="score"><b>${a.my.score}</b><span>/100</span></div>` : ''}
-          ${a.my.status === 'belum' ? `<button class="btn btn-primary btn-sm" data-submit="${a.id}">${icon('upload', 14)} Kumpulkan</button>`
+          ${a.my.status === 'belum' ? `<button class="btn btn-primary btn-sm" data-submit="${a.id}">${icon(a.kind === 'kuis' ? 'target' : 'upload', 14)} ${a.kind === 'kuis' ? 'Kerjakan kuis' : 'Kumpulkan'}</button>`
           : `<button class="btn btn-ghost btn-sm" data-view="${a.id}">${icon('eye', 14)} ${a.my.status === 'dinilai' ? 'Lihat nilai' : 'Lihat pengumpulan'}</button>`}
         </div>
       </div>`;
@@ -182,8 +181,9 @@ PelajarPages.tugas = {
     root.addEventListener('click', e => {
       const f = e.target.closest('[data-filter]');
       if (f) { TugasState.filter = f.dataset.filter; $$('[data-filter]', root).forEach(x => x.classList.toggle('active', x === f)); $('#task-list', root).innerHTML = this.list(sid); return; }
-      const s = e.target.closest('[data-submit]'); if (s) return this.submitModal(s.dataset.submit);
-      const v = e.target.closest('[data-view]'); if (v) return this.viewModal(v.dataset.view);
+      const byId = id => DB.assignments.find(x => x.id === id);
+      const s = e.target.closest('[data-submit]'); if (s) { const a = byId(s.dataset.submit); return a.kind === 'kuis' ? Room.quizModal(a) : this.submitModal(a.id); }
+      const v = e.target.closest('[data-view]'); if (v) { const a = byId(v.dataset.view); return a.kind === 'kuis' ? Room.quizResult(a) : this.viewModal(a.id); }
       const d = e.target.closest('[data-dl]'); if (d) toast(`Membuka “${d.dataset.dl}” (demo)`, 'info');
     });
   },
@@ -295,6 +295,7 @@ PelajarPages.presensi = {
           <button class="btn btn-primary" id="scan-btn">${icon('scan', 16)} Pindai QR (simulasi)</button>
         </div>
         <div class="note info" style="justify-content:center">${icon('clock', 15)}<span>Batas tepat waktu pukul <b>${deadline}</b> WIB (toleransi ${DB.settings.lateTolerance} menit). Lewat dari itu tercatat <b>Terlambat</b>.</span></div>`}
+      <div class="row" style="justify-content:center;margin-top:10px"><a class="btn btn-sm btn-ghost" href="#/sesi/${s.id}">${icon('arrowRight', 14)} Masuk room pertemuan ini</a></div>
     `;
   },
   history(me) {
@@ -350,6 +351,7 @@ PelajarPages.presensi = {
       const t = nowHM();
       const status = toMin(t) <= toMin(s.start) + DB.settings.lateTolerance ? 'hadir' : 'terlambat';
       Q.attOf(me.id)[s.id] = { status, time: t };
+      Room.addAttendee(s, { id: me.id, time: t, status, via: 'Pindai QR' });   // ikut tercatat di daftar hadir room
       DB.audit.unshift({ who: me.name, at: stamp(), what: `Presensi QR ${g.name} · ${sb.code} (${s.topic}) → ${ATT[status].label}` });
       this.stopCam();
       toast(status === 'hadir' ? 'Presensi berhasil! Status: Hadir.' : 'Presensi tercatat dengan status Terlambat.', status === 'hadir' ? 'success' : 'warning');

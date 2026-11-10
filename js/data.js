@@ -152,8 +152,8 @@ const DB = (() => {
   const topicIdx = {};
   let sid = 1;
   // Tempat default sesi dummy per kelompok (tempat kini melekat pada sesi, bukan kelompok)
-  const rooms = { g1: 'Ruang 2 · Sekretariat BAT', g2: 'Ruang 3 · Sekretariat BAT', g3: 'Ruang 1 · Sekretariat BAT', g4: 'Aula Perpustakaan Kota' };
-  const gRoom = gid => rooms[gid];
+  const groupPlace = { g1: 'Ruang 2 · Sekretariat BAT', g2: 'Ruang 3 · Sekretariat BAT', g3: 'Ruang 1 · Sekretariat BAT', g4: 'Aula Perpustakaan Kota' };
+  const gRoom = gid => groupPlace[gid];
   const subjTopics = id => subjects.find(s => s.id === id).topics;
   for (let off = -28; off <= 20; off++) {
     const date = D(off);
@@ -225,6 +225,26 @@ const DB = (() => {
     { id: 'm10', subjectId: 'pbm', title: 'Panduan Kalimat Efektif', type: 'PDF', size: '1,1 MB', date: D(-7), by: 'Laras Kinanti' },
     { id: 'm11', subjectId: 'ppu', title: 'Ringkasan Wawasan Umum', type: 'PDF', size: '1,4 MB', date: D(-3), by: 'Salsabila Azzahra' },
   ];
+
+  /* ---------- Room Pertemuan: setiap sesi otomatis menjadi room ----------
+     Materi & tugas/kuis melekat pada pertemuan (sessionId) sehingga tetap ada di arsip jadwal. */
+  const lastSessBefore = (gids, subjectId, date) => sessions.filter(s => gids.includes(s.groupId) && s.subjectId === subjectId && s.date <= date).pop();
+  assignments.forEach(a => { a.kind = 'tugas'; const s = lastSessBefore(a.groupIds, a.subjectId, a.createdAt); a.sessionId = s ? s.id : null; });
+  materials.forEach(m => { const s = lastSessBefore(groups.map(g => g.id), m.subjectId, m.date); m.sessionId = s ? s.id : null; });
+  const kq = pastOf('g1', 0);
+  if (kq) {
+    materials.push({ id: 'm12', subjectId: kq.subjectId, sessionId: kq.id, title: `Rekaman kelas: ${kq.topic}`, type: 'Link', size: 'Tautan', date: kq.date, by: kq.tutor });
+    assignments.push({ id: 'a10', kind: 'kuis', subjectId: kq.subjectId, groupIds: ['g1'], sessionId: kq.id, by: kq.tutor, title: `Kuis singkat: ${kq.topic}`,
+      desc: '3 soal pilihan ganda untuk mengecek pemahaman materi pertemuan ini.', deadline: kq.date, time: kq.end, createdAt: kq.date, submitted: 5, graded: 5,
+      questions: [
+        { q: 'Nilai dari 2³ + 4 × 3 adalah…', opts: ['20', '36', '14', '24'], ans: 0 },
+        { q: 'Jika f(x) = 3x − 2, maka f(4) = …', opts: ['12', '10', '14', '8'], ans: 1 },
+        { q: 'Rata-rata dari 4, 6, 8, dan 10 adalah…', opts: ['6', '8', '6,5', '7'], ans: 3 },
+      ],
+      my: { status: 'dinilai', score: 67, file: null, submittedAt: `${kq.date} ${kq.end}`, feedback: 'Benar 2 dari 3 soal (dinilai otomatis).', answers: [0, 1, 2] } });
+  }
+  // Status presensi langsung per room (dibuka/ditutup tutor, daftar hadir)
+  const rooms = {};
 
   /* ---------- Perizinan (satu pengajuan = satu sesi, lampiran opsional) ---------- */
   const leaves = [];
@@ -307,6 +327,6 @@ const DB = (() => {
   return {
     today, T, ymd, D, addMin, sortSessions,
     roles, accounts, staff, subjects, groups, students, sessions, attendance, assignments, materials,
-    leaves, corrections, audit, announcements, tryouts, notes, activity, notifications, settings,
+    leaves, corrections, audit, announcements, tryouts, notes, activity, notifications, settings, rooms,
   };
 })();

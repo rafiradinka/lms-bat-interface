@@ -69,7 +69,8 @@ PanitiaPages.dashboard = {
             const g = Q.grp(s.groupId), sb = Q.subj(s.subjectId), st = Q.state(s), r = sessionRecap(s);
             return `<div class="agenda-item ${st.key === 'selesai' ? 'is-past' : ''}" style="--c:${sb.color}"><div class="agenda-time"><b>${s.start}</b><span>${s.end}</span></div>
               <div class="agenda-card"><div class="agenda-top">${stag(sb)}${tag(g)}${badge(st.label, st.tone)}</div><h4>${esc(s.topic)}</h4>
-              <div class="meta-row"><span>${icon('pin', 14)} ${esc(s.location)}</span><span>${icon('user', 14)} ${esc(s.tutor)}</span><span>${icon('users', 14)} ${r.total} pelajar</span></div></div></div>`;
+              <div class="meta-row"><span>${icon('pin', 14)} ${esc(s.location)}</span><span>${icon('user', 14)} ${esc(s.tutor)}</span><span>${icon('users', 14)} ${r.total} pelajar</span></div>
+              <div class="agenda-actions"><a class="btn btn-sm ${st.key === 'selesai' ? 'btn-ghost' : 'btn-primary'}" href="#/sesi/${s.id}">${icon(st.key === 'selesai' ? 'history' : 'arrowRight', 14)} ${st.key === 'selesai' ? 'Buka arsip' : 'Masuk Kelas'}</a></div></div></div>`;
           }).join('') : emptyState('calendar', 'Tidak ada sesi hari ini', 'Cek kalender untuk jadwal berikutnya.')}
         </div>
       </div>
@@ -489,15 +490,17 @@ function ensureSubs(a) {
   a.subs = list.map(st => {
     if (st.id === 'p1' && a.my) return { studentId: st.id, submitted: a.my.status !== 'belum', file: a.my.file, at: a.my.submittedAt, score: a.my.score, feedback: a.my.feedback };
     const i = k++;
+    const quiz = a.kind === 'kuis';   // kuis: dinilai otomatis, tanpa berkas
     const submitted = i < a.submitted - (a.my && a.my.status !== 'belum' ? 1 : 0);
-    const graded = submitted && i < a.graded - (a.my && a.my.status === 'dinilai' ? 1 : 0);
+    const graded = submitted && (quiz || i < a.graded - (a.my && a.my.status === 'dinilai' ? 1 : 0));
     const h = hashStr(st.id + a.id);
+    if (quiz) { const n = a.questions.length, right = submitted ? Math.max(1, n - h % 3) : 0; return { studentId: st.id, submitted, file: null, at: submitted ? `${a.deadline} ${a.time}` : null, score: submitted ? Math.round(Math.min(right, n) / n * 100) : null, feedback: submitted ? 'Dinilai otomatis.' : '' }; }
     return { studentId: st.id, submitted, file: submitted ? `${firstName(st.name)}_${a.title.split(' ')[0]}.pdf` : null, at: submitted ? `${DB.D(Math.min(-1, dayDiff(a.deadline) - 1))} ${pad2(18 + h % 5)}:${pad2(h % 60)}` : null, score: graded ? 70 + h % 28 : null, feedback: graded ? 'Sudah baik, pertahankan.' : '' };
   });
   return a.subs;
 }
 const canManageMat = () => App.has('tutor', 'kurikulum');
-const matItem = (m, withDl = true) => `<div class="item"><div class="item-ic" style="--c:${MAT_COLOR[m.type]}">${icon(MAT_ICON[m.type], 18)}</div><div class="item-body"><div class="item-title">${esc(m.title)}</div><div class="item-sub">${m.type} · ${m.size} · ${esc(m.by)} · ${fmtShort(m.date)}</div></div>${withDl ? `<button class="icon-btn" data-dl="${esc(m.title)}" aria-label="Unduh">${icon(m.type === 'Link' ? 'link' : 'download', 18)}</button>` : ''}</div>`;
+const matItem = (m, withDl = true) => `<div class="item"><div class="item-ic" style="--c:${MAT_COLOR[m.type]}">${icon(MAT_ICON[m.type], 18)}</div><div class="item-body"><div class="item-title">${esc(m.title)}</div><div class="item-sub">${m.type} · ${m.size} · ${esc(m.by)} · ${fmtShort(m.date)}${meetLink(m.sessionId)}</div></div>${withDl ? `<button class="icon-btn" data-dl="${esc(m.title)}" aria-label="Unduh">${icon(m.type === 'Link' ? 'link' : 'download', 18)}</button>` : ''}</div>`;
 
 PanitiaPages.materi = {
   title: sid => sid && Q.subj(sid) ? Q.subj(sid).name : 'Materi dan Tugas',
@@ -601,7 +604,7 @@ PanitiaPages.materi = {
     const subs = ensureSubs(a);
     const canGrade = canManageMat();
     openModal({
-      title: 'Periksa pengumpulan', sub: `${sb.code} · ${a.title}`, size: 'lg',
+      title: a.kind === 'kuis' ? 'Hasil kuis' : 'Periksa pengumpulan', sub: `${sb.code} · ${a.title}${a.kind === 'kuis' ? ' · dinilai otomatis' : ''}`, size: 'lg',
       body: `<div class="row wrap" style="gap:8px">${badge(`${subs.filter(s => s.submitted).length} dikumpul`, 'info')}${badge(`${subs.filter(s => s.score != null).length} dinilai`, 'success')}${badge(`${subs.filter(s => !s.submitted).length} belum mengumpulkan`, 'warning')}</div>
         ${a.groupIds.map(gid => {
           const g = Q.grp(gid), rows = subs.map((s, i) => ({ s, i })).filter(x => Q.student(x.s.studentId).groupId === gid);
@@ -609,7 +612,7 @@ PanitiaPages.materi = {
             ${rows.map(({ s, i }) => {
               const st = Q.student(s.studentId);
               return `<div class="grade-row">
-                <div class="cell-user">${avatar(st.name, 'sm')}<div><b>${esc(st.name)}</b><small>${s.submitted ? `Dikumpul ${fmtStamp(s.at)}` : 'Belum mengumpulkan'}</small>${s.submitted ? `<div style="margin-top:6px"><button class="file-chip" data-file="${esc(s.file)}">${icon('clip', 13)}<span>${esc(s.file)}</span></button></div>` : ''}</div></div>
+                <div class="cell-user">${avatar(st.name, 'sm')}<div><b>${esc(st.name)}</b><small>${s.submitted ? `Dikumpul ${fmtStamp(s.at)}` : 'Belum mengumpulkan'}</small>${s.submitted && s.file ? `<div style="margin-top:6px"><button class="file-chip" data-file="${esc(s.file)}">${icon('clip', 13)}<span>${esc(s.file)}</span></button></div>` : ''}</div></div>
                 ${s.submitted ? `<div class="inputs"><input type="number" min="0" max="100" placeholder="Nilai" data-score="${i}" value="${s.score ?? ''}" ${canGrade ? '' : 'disabled'}><input placeholder="Umpan balik singkat…" data-fb="${i}" value="${esc(s.feedback || '')}" ${canGrade ? '' : 'disabled'}></div>` : `<div>${badge('Menunggu pengumpulan', 'neutral')}</div>`}
               </div>`;
             }).join('') || '<p class="muted small">Belum ada anggota.</p>'}</div>`;
@@ -737,7 +740,7 @@ PanitiaPages.presensi = {
 
     return `
     <div class="page-head">
-      <div><h1>Presensi</h1><p>Buka sesi untuk menampilkan QR Code unik di ruang kelas. Pelajar memindai, sistem mencatat waktu dan menentukan status secara otomatis.</p></div>
+      <div><h1>Presensi</h1><p>Presensi dibuka di dalam <b>room pertemuan</b> setiap sesi: tutor menampilkan QR Code, pelajar memindai atau menekan Hadir, dan sistem menentukan status otomatis. Halaman ini merangkum sesi hari ini, koreksi presensi, dan audit trail.</p></div>
     </div>
     ${!s ? `<div class="card">${emptyState('qr', 'Tidak ada sesi', 'Belum ada sesi yang bisa dibuka.')}</div>` : `
     <div class="cols cols-1-1">
@@ -754,7 +757,8 @@ PanitiaPages.presensi = {
             <div><span>QR diperbarui setiap</span><b>${DB.settings.qrRefresh} detik</b></div>
             <div><span>Tempat</span><b>${esc(s.location)}</b></div>
           </div>
-          ${Q.canRunSession(s) ? `<button class="btn btn-primary btn-lg btn-block" data-open>${icon('qr', 18)} Buka sesi & tampilkan QR</button>` : `<div class="note info">${icon('eye', 15)}<span>Peranmu hanya dapat memantau presensi sesi ini. Sesi dibuka oleh tutor sesi atau Kurikulum.</span></div>`}
+          <a class="btn btn-primary btn-lg btn-block" href="#/sesi/${s.id}" data-room>${icon('arrowRight', 18)} Masuk Kelas${Q.canRunSession(s) ? ' & buka presensi' : ''}</a>
+          ${Q.canRunSession(s) ? '' : `<div class="note info" style="margin-top:10px">${icon('eye', 15)}<span>Peranmu hanya dapat memantau presensi sesi ini. Presensi dibuka oleh tutor sesi atau Kurikulum di room pertemuan.</span></div>`}
         `}
       </div>
       <div class="card">${this.liveView(s)}</div>
@@ -791,19 +795,15 @@ PanitiaPages.presensi = {
         </div>
       </div>`;
   },
+  /* Ringkasan daftar hadir diambil dari Room Pertemuan (sumber data presensi yang sama) */
   liveView(s) {
-    const all = Q.studentsOf(s.groupId);
-    const at = PresensiPan.attendees;
-    const h = at.filter(a => a.status === 'hadir').length, t = at.filter(a => a.status === 'terlambat').length;
-    const notYet = all.filter(st => !at.find(a => a.id === st.id));
+    const rm = Room.state(s), roster = Room.roster(s), t = Room.tally(roster);
+    const order = rm.attendees.map(a => roster.find(r => r.st.id === a.id)).filter(Boolean).reverse();
     return `
-      <div class="card-head"><h3>${icon('users', 16)} Daftar hadir ${PresensiPan.open ? '<span class="live-dot" style="margin-left:4px"></span>' : ''}</h3><span class="muted small">${PresensiPan.open ? 'Real-time' : 'Sesi belum dibuka'}</span></div>
-      <div class="live-stats"><div><b style="color:var(--success)" id="ls-h">${h}</b><span>Hadir</span></div><div><b style="color:var(--warning)" id="ls-t">${t}</b><span>Terlambat</span></div><div><b id="ls-n">${notYet.length}</b><span>Belum</span></div></div>
-      <div class="live-list list" id="live-list">
-        ${at.length ? at.slice().reverse().map(a => this.liveItem(a)).join('') : `<div id="live-empty">${emptyState('scan', PresensiPan.open ? 'Menunggu pelajar memindai…' : 'Belum ada yang presensi', PresensiPan.open ? 'Nama pelajar akan muncul otomatis di sini.' : 'Buka sesi untuk mulai menerima presensi.')}</div>`}
-      </div>
-      ${notYet.length && PresensiPan.open ? `<details style="margin-top:12px"><summary class="small" style="cursor:pointer;color:var(--primary);font-weight:700">Belum presensi (${notYet.length}) · tandai manual</summary>
-        <div class="list" style="margin-top:8px">${notYet.map(st => `<div class="item">${avatar(st.name, 'xs')}<div class="item-body"><div class="item-title">${esc(st.name)}</div></div><button class="btn btn-sm btn-ghost" data-manual="${st.id}">Tandai hadir</button></div>`).join('')}</div></details>` : ''}`;
+      <div class="card-head"><h3>${icon('users', 16)} Daftar hadir ${rm.open ? '<span class="live-dot" style="margin-left:4px"></span>' : ''}</h3><span class="muted small">${rm.open ? 'Presensi dibuka' : rm.closed ? 'Presensi ditutup' : 'Belum dibuka'}</span></div>
+      <div class="live-stats"><div><b style="color:var(--success)">${t.hadir}</b><span>Hadir</span></div><div><b style="color:var(--warning)">${t.terlambat}</b><span>Terlambat</span></div><div><b>${t.belum + t.alpa}</b><span>${rm.closed ? 'Tidak hadir' : 'Belum'}</span></div></div>
+      <div class="live-list list">${order.length ? order.slice(0, 12).map(r => Room.personRow(r)).join('') : emptyState('scan', 'Belum ada yang presensi', 'Masuk ke room pertemuan untuk membuka presensi dan menampilkan QR.')}</div>
+      <a class="btn btn-ghost btn-block mt" href="#/sesi/${s.id}">${icon('arrowRight', 16)} Buka room pertemuan</a>`;
   },
   liveItem(a) {
     const st = Q.student(a.id);

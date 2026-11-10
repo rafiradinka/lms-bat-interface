@@ -214,7 +214,8 @@ function render(keepScroll) {
   const hash = location.hash.replace(/^#\/?/, '');
   const [page, ...params] = (hash || defaultRoute()).split('/');
   const pages = App.isPanitia ? PanitiaPages : PelajarPages;
-  const allowed = navItems().some(n => n.id === page);
+  // Room Pertemuan (#/sesi/<id>) tidak ada di menu; hak akses dicek di halamannya
+  const allowed = navItems().some(n => n.id === page) || page === 'sesi';
   if (!pages[page] || !allowed) { location.replace('#/' + defaultRoute()); return; }
   const p = pages[page];
   const y = window.scrollY;
@@ -226,11 +227,12 @@ function render(keepScroll) {
   $('#page-title').textContent = title;
   document.title = `${title} · LMS BAT`;
   if (p.mount) p.mount(fresh, ...params);
-  $$('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === page));
-  const navDef = navItems().find(n => n.id === page);
+  const navPage = p.navAs || page;
+  $$('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === navPage));
+  const navDef = navItems().find(n => n.id === navPage);
   $$('[data-sub]').forEach(a => {
     const sd = navDef && navDef.sub ? navDef.sub.find(s => s.path === a.dataset.sub) : null;
-    a.classList.toggle('active', a.dataset.parent === page && !!sd && sd.match(params));
+    a.classList.toggle('active', a.dataset.parent === navPage && !!sd && sd.match(params));
   });
   $('#page-crumb').textContent = p.crumb ? p.crumb(...params) : (App.isPanitia ? 'Panitia' : 'Pelajar');
   $('#sidebar').classList.remove('open');
