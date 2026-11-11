@@ -229,134 +229,65 @@ PelajarPages.tugas = {
   },
 };
 
-/* ---------- Presensi ---------- */
-const PresensiPel = { sel: null, filter: 'semua', stream: null };
+/* ---------- Presensi (riwayat saja; presensi dilakukan di room pertemuan dengan tombol lokasi) ---------- */
+const PresensiPel = { filter: 'semua' };
 PelajarPages.presensi = {
   title: 'Presensi',
   render() {
     const me = Q.me();
-    const todays = Q.todaySessions([me.groupId]);
-    if (!PresensiPel.sel || !todays.find(s => s.id === PresensiPel.sel)) {
-      const live = todays.find(s => Q.state(s).key !== 'selesai');
-      PresensiPel.sel = (live || todays[0] || {}).id || null;
-    }
     const st = Q.attStats(me.id);
+    const todays = Q.todaySessions([me.groupId]).filter(s => Q.state(s).key !== 'selesai');
     return `
-    <div class="page-head"><div><h1>Presensi</h1><p>Pindai QR Code yang ditampilkan tutor di ruang kelas untuk mencatat kehadiranmu. Status Hadir/Terlambat ditentukan otomatis oleh sistem.</p></div></div>
+    <div class="page-head"><div><h1>Riwayat Presensi</h1><p>Rekap kehadiranmu di setiap pertemuan. Presensi dilakukan di <b>room pertemuan</b> dengan tombol lokasi setelah tutor membuka presensi.</p></div></div>
+    ${todays.length ? `<div class="note primary" style="margin:0 0 16px">${icon('locate', 15)}<span>Ada sesi hari ini: ${todays.map(s => `<a href="#/sesi/${s.id}" style="text-decoration:underline;font-weight:700">${esc(Q.subj(s.subjectId).code)} · ${s.start}</a>`).join(', ')}. Masuk ke room untuk presensi.</span></div>` : ''}
+    <div class="stats">
+      ${statCard('checkCircle', st.pct + '%', 'Kehadiran', 'success', `${st.hadir + st.terlambat} dari ${st.total} sesi`)}
+      ${statCard('target', st.score, 'Skor presensi', 'primary', 'Hadir 1 · Terlambat 0,5 · Tidak hadir 0')}
+      ${statCard('clock', st.terlambat, 'Terlambat', 'warning')}
+      ${statCard('clipboard', st.izin, 'Izin disetujui', 'info')}
+    </div>
     <div class="cols cols-3-2">
-      <div class="card">${this.scanCard(me, todays)}</div>
       <div class="card">
-        <div class="card-head"><h3>Ringkasan kehadiran</h3></div>
+        <div class="card-head"><h3>${icon('history', 16)} Riwayat kehadiran</h3>
+          <div class="chips">${['semua', 'hadir', 'terlambat', 'izin', 'alpa'].map(k => `<button class="chip ${PresensiPel.filter === k ? 'active' : ''}" data-f="${k}">${k === 'semua' ? 'Semua' : ATT[k].label}</button>`).join('')}</div>
+        </div>
+        <div id="att-hist">${this.history(me)}</div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Ringkasan</h3></div>
         ${attSummary(st)}
         <div class="divider"></div>
-        <div class="card-head" style="margin-bottom:8px"><h3>Kategori status</h3></div>
         <div class="kv">
-          <div><span>${badge('Hadir', 'success')}</span><b class="small muted" style="font-weight:500">Memindai dalam batas waktu</b></div>
-          <div><span>${badge('Terlambat', 'warning')}</span><b class="small muted" style="font-weight:500">Memindai setelah batas waktu</b></div>
-          <div><span>${badge('Izin', 'info')}</span><b class="small muted" style="font-weight:500">Pengajuan izin disetujui</b></div>
-          <div><span>${badge('Tidak hadir', 'danger')}</span><b class="small muted" style="font-weight:500">Tanpa presensi & tanpa izin</b></div>
+          <div><span>${badge('Hadir', 'success')}</span><b class="small muted" style="font-weight:500">Presensi lokasi sebelum batas waktu · 1 poin</b></div>
+          <div><span>${badge('Terlambat', 'warning')}</span><b class="small muted" style="font-weight:500">Lewat ${DB.settings.lateTolerance} menit sejak dibuka · 0,5 poin</b></div>
+          <div><span>${badge('Izin', 'info')}</span><b class="small muted" style="font-weight:500">Izin disetujui · tidak dihitung</b></div>
+          <div><span>${badge('Tidak hadir', 'danger')}</span><b class="small muted" style="font-weight:500">Tanpa presensi & tanpa izin · 0 poin</b></div>
         </div>
       </div>
-    </div>
-    <div class="card mt">
-      <div class="card-head"><h3>${icon('history', 16)} Riwayat kehadiran</h3>
-        <div class="chips">${['semua', 'hadir', 'terlambat', 'izin', 'alpa'].map(k => `<button class="chip ${PresensiPel.filter === k ? 'active' : ''}" data-f="${k}">${k === 'semua' ? 'Semua' : ATT[k].label}</button>`).join('')}</div>
-      </div>
-      <div id="att-hist">${this.history(me)}</div>
     </div>`;
-  },
-  scanCard(me, todays) {
-    if (!todays.length) {
-      const next = Q.nextSession([me.groupId]);
-      return `<div class="card-head"><h3>Sesi hari ini</h3></div>${emptyState('calendar', 'Tidak ada sesi hari ini', next ? `Sesi berikutnya: <b>${esc(Q.subj(next.subjectId).code)} · ${esc(next.topic)}</b>, ${fmtDay(next.date)} pukul ${next.start}.` : '')}`;
-    }
-    const rec = Q.attOf(me.id);
-    const s = Q.session(PresensiPel.sel), g = Q.grp(s.groupId), sb = Q.subj(s.subjectId), done = rec[s.id];
-    const deadline = DB.addMin(s.start, DB.settings.lateTolerance);
-    return `
-      <div class="card-head"><h3>Pilih sesi aktif</h3>${badge(fmtDate(todayStr(), { weekday: 'long', day: 'numeric', month: 'short' }), 'neutral', 'no-dot')}</div>
-      <div class="session-pick">
-        ${todays.map(x => { const k = Q.subj(x.subjectId), r = rec[x.id], stt = Q.state(x); return `<label class="pick ${x.id === s.id ? 'active' : ''}"><input type="radio" name="sess" value="${x.id}" ${x.id === s.id ? 'checked' : ''}><span class="pick-bar" style="--c:${k.color}"></span><div class="pick-body"><b>${esc(k.code)} · ${esc(x.topic)}</b><span>${x.start}–${x.end} · ${esc(x.location)} · ${stt.label}</span></div>${r ? badge(ATT[r.status].label, ATT[r.status].tone) : ''}</label>`; }).join('')}
-      </div>
-      ${done ? `<div class="scan-success">
-          <div class="success-ic ${done.status === 'hadir' ? 't-success' : 't-warning'}">${icon('check', 36)}</div>
-          <h3>Presensi tercatat!</h3>
-          <p class="muted">${esc(sb.name)} · ${esc(s.topic)}</p>
-          <div class="kv-inline"><div><span>Waktu</span><b>${done.time || '—'} WIB</b></div><div><span>Status</span>${badge(ATT[done.status].label, ATT[done.status].tone)}</div></div>
-          <p class="muted small">Ada kesalahan pencatatan? <button class="link" style="color:var(--primary);font-weight:700" data-correct="${s.id}">Ajukan koreksi</button></p>
-        </div>` : `
-        <div class="scanner" id="scanner">
-          <span class="corner c1"></span><span class="corner c2"></span><span class="corner c3"></span><span class="corner c4"></span>
-          <span class="scan-line"></span>
-          <div class="scan-hint">${icon('qr', 44)}<span id="scan-text">Arahkan kamera ke QR Code<br>yang ditampilkan tutor</span></div>
-        </div>
-        <div class="scan-actions">
-          <button class="btn btn-ghost" id="cam-btn">${icon('camera', 16)} Aktifkan kamera</button>
-          <button class="btn btn-primary" id="scan-btn">${icon('scan', 16)} Pindai QR (simulasi)</button>
-        </div>
-        <div class="note info" style="justify-content:center">${icon('clock', 15)}<span>Batas tepat waktu pukul <b>${deadline}</b> WIB (toleransi ${DB.settings.lateTolerance} menit). Lewat dari itu tercatat <b>Terlambat</b>.</span></div>`}
-      <div class="row" style="justify-content:center;margin-top:10px"><a class="btn btn-sm btn-ghost" href="#/sesi/${s.id}">${icon('arrowRight', 14)} Masuk room pertemuan ini</a></div>
-    `;
   },
   history(me) {
     const rec = Q.attOf(me.id);
     const rows = DB.sessions.filter(s => rec[s.id] && s.date <= todayStr())
       .filter(s => PresensiPel.filter === 'semua' || rec[s.id].status === PresensiPel.filter).reverse();
     if (!rows.length) return emptyState('history', 'Belum ada data', 'Tidak ada riwayat pada kategori ini.');
-    return `<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Mapel</th><th>Topik</th><th>Waktu presensi</th><th>Status</th><th></th></tr></thead><tbody>
+    return `<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Mapel</th><th>Topik</th><th>Waktu</th><th>Status</th><th>Poin</th><th></th></tr></thead><tbody>
       ${rows.map(s => {
         const r = rec[s.id], m = ATT[r.status];
         const corr = DB.corrections.find(k => k.studentId === me.id && k.sessionId === s.id);
         const act = corr ? badge(corr.status === 'pending' ? 'Koreksi diproses' : corr.status === 'approved' ? 'Koreksi disetujui' : 'Koreksi ditolak', corr.status === 'pending' ? 'neutral' : corr.status === 'approved' ? 'success' : 'danger')
           : ['alpa', 'terlambat'].includes(r.status) ? `<button class="btn btn-sm btn-ghost" data-correct="${s.id}">Ajukan koreksi</button>` : '';
-        return `<tr><td><b>${fmtDay(s.date)}</b></td><td>${stag(Q.subj(s.subjectId))}</td><td><div class="ellipsis">${esc(s.topic)}</div></td><td>${r.time ? r.time + ' WIB' : '—'}</td><td>${badge(m.label, m.tone)}</td><td style="text-align:right">${act}</td></tr>`;
+        return `<tr><td><b>${fmtDay(s.date)}</b></td><td>${stag(Q.subj(s.subjectId))}</td><td><a class="ellipsis" href="#/sesi/${s.id}" style="color:inherit">${esc(s.topic)}</a></td><td>${r.time ? r.time + ' WIB' : '—'}</td><td>${badge(m.label, m.tone)}</td><td><b>${fmtPoint(r.status)}</b></td><td style="text-align:right">${act}</td></tr>`;
       }).join('')}
     </tbody></table></div>`;
   },
-  stopCam() { if (PresensiPel.stream) { PresensiPel.stream.getTracks().forEach(t => t.stop()); PresensiPel.stream = null; } },
   mount(root) {
-    Cleanup.add(() => this.stopCam());
     const me = Q.me();
-    root.addEventListener('change', e => { if (e.target.name === 'sess') { PresensiPel.sel = e.target.value; this.stopCam(); App.refresh(); } });
     root.addEventListener('click', e => {
       const f = e.target.closest('[data-f]');
       if (f) { PresensiPel.filter = f.dataset.f; $$('[data-f]', root).forEach(x => x.classList.toggle('active', x === f)); $('#att-hist', root).innerHTML = this.history(me); return; }
       const k = e.target.closest('[data-correct]'); if (k) return openCorrection(k.dataset.correct);
-      if (e.target.closest('#cam-btn')) return this.startCam(root);
-      if (e.target.closest('#scan-btn')) return this.simulate(root, me);
     });
-  },
-  async startCam(root) {
-    const sc = $('#scanner', root);
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return toast('Kamera tidak didukung di browser ini. Gunakan tombol simulasi.', 'warning');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-      PresensiPel.stream = stream;
-      const v = document.createElement('video');
-      v.autoplay = true; v.playsInline = true; v.muted = true; v.srcObject = stream;
-      sc.prepend(v); sc.classList.add('live');
-      $('#cam-btn', root).disabled = true;
-      toast('Kamera aktif. Pada prototipe ini pemindaian disimulasikan.', 'info');
-    } catch (err) {
-      toast('Akses kamera ditolak / tidak tersedia. Gunakan tombol simulasi.', 'warning');
-    }
-  },
-  simulate(root, me) {
-    const s = Q.session(PresensiPel.sel), g = Q.grp(s.groupId), sb = Q.subj(s.subjectId);
-    const sc = $('#scanner', root);
-    sc.classList.add('scanning');
-    $('#scan-text', root).innerHTML = 'Memindai QR Code…';
-    $('#scan-btn', root).classList.add('loading');
-    setTimeout(() => {
-      const t = nowHM();
-      const status = toMin(t) <= toMin(s.start) + DB.settings.lateTolerance ? 'hadir' : 'terlambat';
-      Q.attOf(me.id)[s.id] = { status, time: t };
-      Room.addAttendee(s, { id: me.id, time: t, status, via: 'Pindai QR' });   // ikut tercatat di daftar hadir room
-      DB.audit.unshift({ who: me.name, at: stamp(), what: `Presensi QR ${g.name} · ${sb.code} (${s.topic}) → ${ATT[status].label}` });
-      this.stopCam();
-      toast(status === 'hadir' ? 'Presensi berhasil! Status: Hadir.' : 'Presensi tercatat dengan status Terlambat.', status === 'hadir' ? 'success' : 'warning');
-      App.refresh();
-    }, 1800);
   },
 };
 
@@ -492,7 +423,7 @@ PelajarPages.laporan = {
       <div class="actions"><button class="btn btn-ghost" data-pdf>${icon('download', 16)} Unduh laporan</button></div>
     </div>
     <div class="stats">
-      ${statCard('checkCircle', st.pct + '%', 'Kehadiran', 'success', `${st.total} sesi tercatat`)}
+      ${statCard('checkCircle', st.pct + '%', 'Kehadiran', 'success', `${st.total} sesi tercatat · skor presensi ${st.score}`)}
       ${statCard('target', Q.taskAvg(me.id), 'Rata-rata nilai tugas', 'primary', `${graded.length} tugas dinilai`)}
       ${statCard('file', `${done}/${tasks.length}`, 'Tugas terkumpul', 'info', `${tasks.length ? Math.round(done / tasks.length * 100) : 0}% progres`)}
       ${statCard('trending', Q.toAvg(last), 'Rata-rata tryout', 'accent', `${Q.toAvg(last) - Q.toAvg(prev) >= 0 ? '▲ +' : '▼ '}${Q.toAvg(last) - Q.toAvg(prev)} dari TO sebelumnya`)}

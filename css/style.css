@@ -851,3 +851,18 @@ tr.row-muted td { opacity: .6; }
 .quiz-opt.wrong { border-color: rgba(248, 113, 113, .55); background: var(--danger-soft); }
 .quiz-opt small { margin-left: auto; }
 a.item.clickable { color: inherit; }
+
+/* Presensi berbasis lokasi */
+.geo-stage { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 10px 0 4px; }
+.geo-ring { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); position: relative; }
+.geo-ring::before, .geo-ring::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(139, 123, 255, .45); animation: geoPulse 2.4s ease-out infinite; }
+.geo-ring::after { animation-delay: 1.2s; }
+@keyframes geoPulse { from { transform: scale(1); opacity: .9; } to { transform: scale(1.7); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .geo-ring::before, .geo-ring::after { animation: none; } }
+.geo-stage .kv-inline { display: flex; gap: 28px; justify-content: center; }
+#geo-msg { width: 100%; }
+#geo-msg .note { margin: 0; }
+.demo-geo { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; padding-top: 10px; border-top: 1px dashed var(--border-soft); width: 100%; }
+.place-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr auto; gap: 8px; align-items: center; }
+.place-row + .place-row { margin-top: 8px; }
+@media (max-width: 560px) { .place-row { grid-template-columns: 1fr 1fr; } .place-row input:first-child { grid-column: 1 / -1; } }

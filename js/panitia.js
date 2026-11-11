@@ -263,7 +263,7 @@ function studentDetailModal(id) {
     title: s.name, sub: `${s.school} · ${s.status}`, size: 'lg',
     body: `
       <div class="stats">
-        ${statCard('checkCircle', st.pct + '%', 'Kehadiran', 'success')}
+        ${statCard('checkCircle', st.pct + '%', 'Kehadiran', 'success', `Skor presensi ${st.score}`)}
         ${statCard('target', Q.taskAvg(s.id), 'Rata-rata tugas', 'primary')}
         ${statCard('trending', hist[hist.length - 1], 'Tryout terakhir', 'accent')}
         ${statCard('clipboard', leaves.length, 'Pengajuan izin', 'warning')}
@@ -725,8 +725,8 @@ PanitiaPages.materi = {
   },
 };
 
-/* ---------- Presensi (generator QR + daftar hadir real-time) ---------- */
-const PresensiPan = { sessionId: null, open: false, attendees: [], code: '', tick: 0 };
+/* ---------- Presensi (ringkasan sesi hari ini · koreksi · audit). Presensi dibuka di room pertemuan. ---------- */
+const PresensiPan = { sessionId: null };
 PanitiaPages.presensi = {
   title: 'Presensi',
   render() {
@@ -734,32 +734,31 @@ PanitiaPages.presensi = {
     let options = scope.filter(s => s.date === todayStr());
     const demo = !options.length;
     if (demo) options = scope.filter(Q.isUpcoming).slice(0, 3);
-    if (!PresensiPan.sessionId || !options.find(s => s.id === PresensiPan.sessionId)) { PresensiPan.sessionId = (options.find(Q.canRunSession) || options[0] || {}).id || null; PresensiPan.open = false; PresensiPan.attendees = []; }
+    if (!PresensiPan.sessionId || !options.find(s => s.id === PresensiPan.sessionId)) PresensiPan.sessionId = (options.find(Q.canRunSession) || options[0] || {}).id || null;
     const s = Q.session(PresensiPan.sessionId);
     const corr = DB.corrections.filter(k => scope.includes(Q.session(k.sessionId)));
+    const rm = s ? Room.state(s) : null;
 
     return `
     <div class="page-head">
-      <div><h1>Presensi</h1><p>Presensi dibuka di dalam <b>room pertemuan</b> setiap sesi: tutor menampilkan QR Code, pelajar memindai atau menekan Hadir, dan sistem menentukan status otomatis. Halaman ini merangkum sesi hari ini, koreksi presensi, dan audit trail.</p></div>
+      <div><h1>Presensi</h1><p>Presensi dilakukan di <b>room pertemuan</b>: tutor membuka presensi, lalu pelajar menekan tombol lokasi dan harus berada di area tempat sesi. Terlambat dihitung ${DB.settings.lateTolerance} menit setelah presensi dibuka. Halaman ini merangkum sesi hari ini, koreksi presensi, dan audit trail.</p></div>
     </div>
-    ${!s ? `<div class="card">${emptyState('qr', 'Tidak ada sesi', 'Belum ada sesi yang bisa dibuka.')}</div>` : `
+    ${!s ? `<div class="card">${emptyState('locate', 'Tidak ada sesi', 'Belum ada sesi dalam cakupanmu.')}</div>` : `
     <div class="cols cols-1-1">
-      <div class="card fullscreen-qr" id="qr-card">
-        ${PresensiPan.open ? this.qrView(s) : `
-          <div class="card-head"><h3>${icon('qr', 16)} Buka sesi presensi</h3>${demo ? badge('Mode demo', 'accent', 'no-dot') : badge('Hari ini', 'accent', 'no-dot')}</div>
-          ${demo ? `<div class="note warning" style="margin:0 0 14px">${icon('alert', 15)}<span>Tidak ada sesi hari ini dalam cakupanmu. Sesi mendatang ditampilkan untuk keperluan demo.</span></div>` : ''}
-          <div class="session-pick">
-            ${options.map(x => { const g = Q.grp(x.groupId), sb = Q.subj(x.subjectId); return `<label class="pick ${x.id === s.id ? 'active' : ''}"><input type="radio" name="ps" value="${x.id}" ${x.id === s.id ? 'checked' : ''}><span class="pick-bar" style="--c:${sb.color}"></span><div class="pick-body"><b>${esc(sb.code)} · ${esc(x.topic)}</b><span>${esc(g.name)} · ${fmtDay(x.date)} · ${x.start}–${x.end} · ${esc(x.tutor)}</span></div></label>`; }).join('')}
-          </div>
-          <div class="kv" style="margin-bottom:16px">
-            <div><span>Kelompok Kelas</span><b>${esc(Q.grp(s.groupId).name)} · ${Q.studentsOf(s.groupId).length} pelajar</b></div>
-            <div><span>Batas tepat waktu</span><b>${DB.addMin(s.start, DB.settings.lateTolerance)} WIB (${DB.settings.lateTolerance} menit)</b></div>
-            <div><span>QR diperbarui setiap</span><b>${DB.settings.qrRefresh} detik</b></div>
-            <div><span>Tempat</span><b>${esc(s.location)}</b></div>
-          </div>
-          <a class="btn btn-primary btn-lg btn-block" href="#/sesi/${s.id}" data-room>${icon('arrowRight', 18)} Masuk Kelas${Q.canRunSession(s) ? ' & buka presensi' : ''}</a>
-          ${Q.canRunSession(s) ? '' : `<div class="note info" style="margin-top:10px">${icon('eye', 15)}<span>Peranmu hanya dapat memantau presensi sesi ini. Presensi dibuka oleh tutor sesi atau Kurikulum di room pertemuan.</span></div>`}
-        `}
+      <div class="card">
+        <div class="card-head"><h3>${icon('locate', 16)} Sesi presensi</h3>${demo ? badge('Mode demo', 'accent', 'no-dot') : badge('Hari ini', 'accent', 'no-dot')}</div>
+        ${demo ? `<div class="note warning" style="margin:0 0 14px">${icon('alert', 15)}<span>Tidak ada sesi hari ini dalam cakupanmu. Sesi mendatang ditampilkan sebagai contoh.</span></div>` : ''}
+        <div class="session-pick">
+          ${options.map(x => { const g = Q.grp(x.groupId), sb = Q.subj(x.subjectId), r = Room.state(x); return `<label class="pick ${x.id === s.id ? 'active' : ''}"><input type="radio" name="ps" value="${x.id}" ${x.id === s.id ? 'checked' : ''}><span class="pick-bar" style="--c:${sb.color}"></span><div class="pick-body"><b>${esc(sb.code)} · ${esc(x.topic)}</b><span>${esc(g.name)} · ${fmtDay(x.date)} · ${x.start}–${x.end} · ${esc(x.tutor)}</span></div>${r.open ? badge('Dibuka', 'danger') : r.closed ? badge('Ditutup', 'neutral') : ''}</label>`; }).join('')}
+        </div>
+        <div class="kv" style="margin-bottom:16px">
+          <div><span>Kelompok Kelas</span><b>${esc(Q.grp(s.groupId).name)} · ${Q.studentsOf(s.groupId).length} pelajar</b></div>
+          <div><span>Status presensi</span><b>${rm.open ? `Dibuka ${Room.openTime(s)} WIB` : rm.closed ? 'Sudah ditutup' : 'Belum dibuka'}</b></div>
+          <div><span>Batas tepat waktu</span><b>${rm.open || rm.closed ? `${Room.deadline(s)} WIB` : `Jam dibuka + ${DB.settings.lateTolerance} menit`}</b></div>
+          <div><span>Titik lokasi</span><b>${esc(placeOf(s).name)} · radius ${DB.settings.geoRadius} m</b></div>
+        </div>
+        <a class="btn btn-primary btn-lg btn-block" href="#/sesi/${s.id}">${icon('arrowRight', 18)} Masuk Kelas${Q.canRunSession(s) && !rm.open && !rm.closed ? ' & buka presensi' : ''}</a>
+        ${Q.canRunSession(s) ? '' : `<div class="note info" style="margin-top:10px">${icon('eye', 15)}<span>Peranmu hanya dapat memantau presensi sesi ini. Presensi dibuka oleh tutor sesi atau Kurikulum di room pertemuan.</span></div>`}
       </div>
       <div class="card">${this.liveView(s)}</div>
     </div>`}
@@ -780,108 +779,33 @@ PanitiaPages.presensi = {
       </div>
     </div>`;
   },
-  qrView(s) {
-    const g = Q.grp(s.groupId), sb = Q.subj(s.subjectId);
-    return `
-      <div class="card-head"><h3><span class="live-dot"></span> Sesi presensi dibuka</h3><div class="row"><button class="icon-btn" data-full title="Layar penuh">${icon('expand', 18)}</button></div></div>
-      <div class="qr-stage">
-        <div>${tag(g)} ${stag(sb)} <b style="margin-left:6px">${esc(s.topic)}</b></div>
-        <div class="qr-frame"><canvas id="qr-canvas" aria-label="QR Code presensi"></canvas></div>
-        <div class="qr-code" id="qr-code">${PresensiPan.code}</div>
-        <div class="qr-timer"><span>QR diperbarui dalam <b id="qr-sec">${DB.settings.qrRefresh}</b> dtk</span><div class="progress thin"><span id="qr-bar" style="width:100%"></span></div></div>
-        <div class="row wrap" style="justify-content:center">
-          <button class="btn btn-ghost" data-refresh-qr>${icon('refresh', 16)} Perbarui QR</button>
-          <button class="btn btn-danger" data-close-sess>${icon('xCircle', 16)} Tutup sesi</button>
-        </div>
-      </div>`;
-  },
   /* Ringkasan daftar hadir diambil dari Room Pertemuan (sumber data presensi yang sama) */
   liveView(s) {
     const rm = Room.state(s), roster = Room.roster(s), t = Room.tally(roster);
     const order = rm.attendees.map(a => roster.find(r => r.st.id === a.id)).filter(Boolean).reverse();
+    const izin = roster.filter(r => r.status === 'izin');
     return `
       <div class="card-head"><h3>${icon('users', 16)} Daftar hadir ${rm.open ? '<span class="live-dot" style="margin-left:4px"></span>' : ''}</h3><span class="muted small">${rm.open ? 'Presensi dibuka' : rm.closed ? 'Presensi ditutup' : 'Belum dibuka'}</span></div>
       <div class="live-stats"><div><b style="color:var(--success)">${t.hadir}</b><span>Hadir</span></div><div><b style="color:var(--warning)">${t.terlambat}</b><span>Terlambat</span></div><div><b>${t.belum + t.alpa}</b><span>${rm.closed ? 'Tidak hadir' : 'Belum'}</span></div></div>
-      <div class="live-list list">${order.length ? order.slice(0, 12).map(r => Room.personRow(r)).join('') : emptyState('scan', 'Belum ada yang presensi', 'Masuk ke room pertemuan untuk membuka presensi dan menampilkan QR.')}</div>
-      <a class="btn btn-ghost btn-block mt" href="#/sesi/${s.id}">${icon('arrowRight', 16)} Buka room pertemuan</a>`;
-  },
-  liveItem(a) {
-    const st = Q.student(a.id);
-    return `<div class="item">${avatar(st.name, 'sm')}<div class="item-body"><div class="item-title">${esc(st.name)}</div><div class="item-sub">${a.time} WIB${a.manual ? ' · ditandai manual' : ' · via QR'}</div></div>${badge(ATT[a.status].label, ATT[a.status].tone)}</div>`;
-  },
-  newCode() { PresensiPan.code = 'BAT-' + Math.random().toString(36).slice(2, 6).toUpperCase() + '-' + Math.floor(Math.random() * 90 + 10); },
-  startLive(root) {
-    const s = Q.session(PresensiPan.sessionId);
-    const canvas = $('#qr-canvas', root);
-    const draw = () => { drawQR(canvas, PresensiPan.code + s.id); $('#qr-code', root).textContent = PresensiPan.code; };
-    draw();
-    let sec = DB.settings.qrRefresh;
-    const timer = setInterval(() => {
-      sec--;
-      if (sec <= 0) { sec = DB.settings.qrRefresh; this.newCode(); draw(); }
-      const el = $('#qr-sec', root); if (el) el.textContent = sec;
-      const bar = $('#qr-bar', root); if (bar) bar.style.width = (sec / DB.settings.qrRefresh * 100) + '%';
-    }, 1000);
-    const all = Q.studentsOf(s.groupId);
-    const sim = () => {
-      const left = all.filter(st => !PresensiPan.attendees.find(a => a.id === st.id));
-      if (left.length <= 1) return;
-      const st = left[Math.floor(Math.random() * left.length)];
-      const late = PresensiPan.attendees.length > all.length * 0.65 && Math.random() < 0.6;
-      this.addAttendee(root, { id: st.id, time: nowHM(), status: late ? 'terlambat' : 'hadir' });
-      simT = setTimeout(sim, 1800 + Math.random() * 2600);
-    };
-    let simT = setTimeout(sim, 1500);
-    Cleanup.add(() => { clearInterval(timer); clearTimeout(simT); });
-  },
-  addAttendee(root, a) {
-    PresensiPan.attendees.push(a);
-    const list = $('#live-list', root);
-    const empty = $('#live-empty', root); if (empty) empty.remove();
-    list.insertAdjacentHTML('afterbegin', this.liveItem(a));
-    const at = PresensiPan.attendees, all = Q.studentsOf(Q.session(PresensiPan.sessionId).groupId);
-    $('#ls-h', root).textContent = at.filter(x => x.status === 'hadir').length;
-    $('#ls-t', root).textContent = at.filter(x => x.status === 'terlambat').length;
-    $('#ls-n', root).textContent = all.length - at.length;
-    const m = $(`[data-manual="${a.id}"]`, root); if (m) m.closest('.item').remove();
+      <div class="live-list list">${order.length || izin.length ? [...order.slice(0, 12), ...izin].map(r => Room.personRow(r)).join('') : emptyState('locate', 'Belum ada yang presensi', 'Pelajar dengan izin yang sudah disetujui otomatis tercatat Izin di sini.')}</div>`;
   },
   mount(root) {
-    if (PresensiPan.open) this.startLive(root);
-    root.addEventListener('change', e => { if (e.target.name === 'ps') { PresensiPan.sessionId = e.target.value; PresensiPan.attendees = []; App.refresh(); } });
+    root.addEventListener('change', e => { if (e.target.name === 'ps') { PresensiPan.sessionId = e.target.value; App.refresh(); } });
     root.addEventListener('click', e => {
-      const t = e.target;
-      const sLabel = s => `${Q.grp(s.groupId).name} · ${Q.subj(s.subjectId).code}`;
-      if (t.closest('[data-open]')) {
-        PresensiPan.open = true; PresensiPan.attendees = []; this.newCode();
-        const s = Q.session(PresensiPan.sessionId);
-        DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Membuka sesi presensi ${sLabel(s)}` });
-        toast('Sesi presensi dibuka. Tampilkan QR ke pelajar.'); return App.refresh();
+      const ok = e.target.closest('[data-kok]'), no = e.target.closest('[data-kno]');
+      if (!ok && !no) return;
+      const k = DB.corrections.find(x => x.id === (ok || no).dataset[ok ? 'kok' : 'kno']);
+      const st = Q.student(k.studentId), ss = Q.session(k.sessionId);
+      k.status = ok ? 'approved' : 'rejected';
+      if (ok) {
+        Q.attOf(k.studentId)[k.sessionId] = { status: 'hadir', time: ss.start };
+        // Perbarui juga daftar hadir room bila presensinya sudah dibuka/ditutup
+        const rm = DB.rooms[ss.id];
+        if (rm) { rm.attendees = rm.attendees.filter(a => a.id !== st.id); rm.attendees.push({ id: st.id, time: ss.start, status: 'hadir', via: 'Koreksi disetujui' }); }
       }
-      if (t.closest('[data-refresh-qr]')) { this.newCode(); drawQR($('#qr-canvas', root), PresensiPan.code + PresensiPan.sessionId); $('#qr-code', root).textContent = PresensiPan.code; return toast('QR Code diperbarui.', 'info'); }
-      if (t.closest('[data-full]')) { const el = $('#qr-card', root); if (document.fullscreenElement) document.exitFullscreen(); else if (el.requestFullscreen) el.requestFullscreen(); return; }
-      if (t.closest('[data-close-sess]')) {
-        const s = Q.session(PresensiPan.sessionId), n = Q.studentsOf(s.groupId).length - PresensiPan.attendees.length;
-        PresensiPan.open = false;
-        DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Menutup sesi presensi ${sLabel(s)} (${PresensiPan.attendees.length} presensi)` });
-        toast(`Sesi ditutup. ${n} pelajar tanpa presensi & izin tercatat “Tidak hadir”.`, 'info'); return App.refresh();
-      }
-      const mn = t.closest('[data-manual]');
-      if (mn) {
-        const st = Q.student(mn.dataset.manual);
-        this.addAttendee(root, { id: st.id, time: nowHM(), status: 'hadir', manual: true });
-        DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Menandai manual ${st.name} → Hadir` });
-        return toast(`${esc(st.name)} ditandai hadir (tercatat di audit trail).`);
-      }
-      const ok = t.closest('[data-kok]'), no = t.closest('[data-kno]');
-      if (ok || no) {
-        const k = DB.corrections.find(x => x.id === (ok || no).dataset[ok ? 'kok' : 'kno']);
-        const st = Q.student(k.studentId);
-        k.status = ok ? 'approved' : 'rejected';
-        if (ok) Q.attOf(k.studentId)[k.sessionId] = { status: 'hadir', time: Q.session(k.sessionId).start };
-        DB.audit.unshift({ who: App.user.name, at: stamp(), what: ok ? `Koreksi presensi ${st.name} disetujui → Hadir` : `Koreksi presensi ${st.name} ditolak` });
-        toast(ok ? 'Koreksi disetujui. Status presensi diperbarui.' : 'Koreksi ditolak.', ok ? 'success' : 'info');
-        return App.refresh();
-      }
+      DB.audit.unshift({ who: App.user.name, at: stamp(), what: ok ? `Koreksi presensi ${st.name} disetujui → Hadir` : `Koreksi presensi ${st.name} ditolak` });
+      toast(ok ? 'Koreksi disetujui. Status presensi diperbarui.' : 'Koreksi ditolak.', ok ? 'success' : 'info');
+      App.refresh();
     });
   },
 };
@@ -1010,8 +934,8 @@ PanitiaPages.laporan = {
     </div>
     <div class="card mt">
       <div class="card-head"><h3>Rekap pelajar</h3><span class="muted small">Klik baris untuk detail</span></div>
-      <div class="table-wrap"><table><thead><tr><th>Pelajar</th><th>Kelompok Kelas</th><th style="width:170px">Kehadiran</th><th>Nilai tugas</th><th>Tryout terakhir</th><th>Status</th></tr></thead><tbody>
-        ${students.map(s => { const p = Q.attStats(s.id).pct, t = Q.taskAvg(s.id), flag = p < 80 || t < 72; return `<tr style="cursor:pointer" data-detail="${s.id}"><td><div class="cell-user">${avatar(s.name, 'sm')}<div><b>${esc(s.name)}</b><small>${esc(s.school)}</small></div></div></td><td>${tag(Q.grp(s.groupId))}</td><td>${progRow(p, toneByPct(p))}</td><td><b>${t}</b></td><td>${Q.lastTO(s.id)}</td><td>${flag ? badge('Perlu perhatian', 'danger') : badge('Baik', 'success')}</td></tr>`; }).join('')}
+      <div class="table-wrap"><table><thead><tr><th>Pelajar</th><th>Kelompok Kelas</th><th style="width:170px">Kehadiran</th><th>Skor presensi</th><th>Nilai tugas</th><th>Tryout terakhir</th><th>Status</th></tr></thead><tbody>
+        ${students.map(s => { const p = Q.attStats(s.id).pct, t = Q.taskAvg(s.id), flag = p < 80 || t < 72; return `<tr style="cursor:pointer" data-detail="${s.id}"><td><div class="cell-user">${avatar(s.name, 'sm')}<div><b>${esc(s.name)}</b><small>${esc(s.school)}</small></div></div></td><td>${tag(Q.grp(s.groupId))}</td><td>${progRow(p, toneByPct(p))}</td><td><b>${Q.attStats(s.id).score}</b></td><td><b>${t}</b></td><td>${Q.lastTO(s.id)}</td><td>${flag ? badge('Perlu perhatian', 'danger') : badge('Baik', 'success')}</td></tr>`; }).join('')}
       </tbody></table></div>
     </div>`;
   },
@@ -1149,7 +1073,7 @@ PanitiaPages.pengaturan = {
       ['Jadwal sesi', 'Lihat', 'Lihat', 'Lihat', 'Kelola + cek bentrok', 'Pantau', 'Kelola penuh'],
       ['Materi (per mapel)', 'Akses', 'Kelola mapel diampu', '–', 'Kelola', 'Pantau', 'Kelola penuh'],
       ['Tugas dan nilai', 'Kumpul, lihat nilai', 'Kelola, menilai', '–', 'Kelola', 'Pantau', 'Kelola penuh'],
-      ['Presensi', 'Presensi, koreksi', 'Buka sesi sendiri', 'Pantau dampingan', 'Pantau, koreksi', 'Pantau', 'Kelola penuh'],
+      ['Presensi (lokasi, di room)', 'Tombol lokasi, riwayat, koreksi', 'Buka/tutup sesi sendiri', 'Pantau dampingan', 'Buka/tutup, koreksi, atur lokasi', 'Pantau', 'Kelola penuh'],
       ['Perizinan (per sesi)', 'Ajukan', '–', 'Verifikasi awal', 'Keputusan akhir', 'Pantau', 'Kelola penuh'],
       ['Laporan perkembangan', 'Milik sendiri', 'Kelompok diajar', 'Pelajar dampingan', 'Menyeluruh, input tryout', 'Menyeluruh', 'Menyeluruh'],
       ['Pengguna & peran', '–', '–', '–', '–', '–', 'Kelola'],
@@ -1176,12 +1100,22 @@ PanitiaPages.pengaturan = {
       </div>
       <div>
         <div class="card">
-          <div class="card-head"><h3>${icon('qr', 16)} Pengaturan presensi</h3>${canSys ? '' : badge('Hanya Kurikulum/Admin', 'neutral', 'no-dot')}</div>
+          <div class="card-head"><h3>${icon('locate', 16)} Pengaturan presensi</h3>${canSys ? '' : badge('Hanya Kurikulum/Admin', 'neutral', 'no-dot')}</div>
           <div class="form-grid">
-            <label class="field"><span>Toleransi keterlambatan (menit)</span><input type="number" id="st-late" value="${DB.settings.lateTolerance}" min="0" max="60" ${canSys ? '' : 'disabled'}></label>
-            <label class="field"><span>QR Code diperbarui setiap (detik)</span><input type="number" id="st-qr" value="${DB.settings.qrRefresh}" min="10" max="120" ${canSys ? '' : 'disabled'}></label>
+            <label class="field"><span>Toleransi keterlambatan sejak presensi dibuka (menit)</span><input type="number" id="st-late" value="${DB.settings.lateTolerance}" min="0" max="60" ${canSys ? '' : 'disabled'}></label>
+            <label class="field"><span>Radius area presensi (meter)</span><input type="number" id="st-radius" value="${DB.settings.geoRadius}" min="20" max="1000" ${canSys ? '' : 'disabled'}><small class="muted small">Pelajar harus berada dalam radius ini dari titik lokasi tempat sesi.</small></label>
             <label class="field"><span>Batas pengajuan izin</span><select id="st-izin" ${canSys ? '' : 'disabled'}>${['H-0', 'H-1', 'H-2'].map(v => `<option ${DB.settings.leaveDeadline === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
             <label class="field"><span>Batas pengajuan koreksi presensi (hari)</span><input type="number" id="st-corr" value="${DB.settings.correctionWindow}" min="1" max="7" ${canSys ? '' : 'disabled'}></label>
+          </div>
+          <div class="field mt"><span>Titik lokasi tempat sesi</span>
+            <small class="muted small" style="margin-bottom:6px">Nama · kata kunci pada kolom “Tempat” sesi · lintang · bujur</small>
+            ${DB.places.map(pl => `<div class="place-row" data-place="${pl.id}">
+              <input data-k="name" value="${esc(pl.name)}" aria-label="Nama titik" ${canSys ? '' : 'disabled'}>
+              <input data-k="match" value="${esc(pl.match)}" aria-label="Kata kunci tempat" ${canSys ? '' : 'disabled'}>
+              <input data-k="lat" value="${pl.lat}" inputmode="decimal" aria-label="Lintang" ${canSys ? '' : 'disabled'}>
+              <input data-k="lng" value="${pl.lng}" inputmode="decimal" aria-label="Bujur" ${canSys ? '' : 'disabled'}>
+            </div>`).join('')}
+            ${canSys ? `<div class="row wrap" style="gap:8px;margin-top:8px"><button class="btn btn-sm btn-ghost" data-add-place>${icon('plus', 14)} Tambah titik</button><button class="btn btn-sm btn-ghost" data-here>${icon('locate', 14)} Isi titik terakhir dengan lokasi saya</button></div>` : ''}
           </div>
           ${canSys ? `<button class="btn btn-primary btn-block mt" data-save-sys>Simpan pengaturan</button>` : ''}
         </div>
@@ -1200,9 +1134,28 @@ PanitiaPages.pengaturan = {
     root.addEventListener('click', e => {
       if (e.target.closest('[data-pw]')) return openPasswordModal();
       if (e.target.closest('[data-save-profile]')) return toast('Profil disimpan (demo).');
+      if (e.target.closest('[data-add-place]')) {
+        DB.places.push({ id: 'pl' + Date.now(), name: 'Titik baru', match: 'Titik baru', lat: DB.places[0].lat, lng: DB.places[0].lng });
+        return App.refresh();
+      }
+      if (e.target.closest('[data-here]')) {
+        if (!navigator.geolocation) return toast('Browser tidak mendukung GPS.', 'error');
+        return navigator.geolocation.getCurrentPosition(pos => {
+          const row = $$('[data-place]', root).pop();
+          row.querySelector('[data-k="lat"]').value = pos.coords.latitude.toFixed(6);
+          row.querySelector('[data-k="lng"]').value = pos.coords.longitude.toFixed(6);
+          toast('Koordinat terisi. Klik Simpan pengaturan.', 'info');
+        }, () => toast('Lokasi tidak dapat diambil. Periksa izin lokasi browser.', 'error'), { enableHighAccuracy: true, timeout: 10000 });
+      }
       if (e.target.closest('[data-save-sys]')) {
         DB.settings.lateTolerance = Number($('#st-late', root).value) || 15;
-        DB.settings.qrRefresh = Math.max(10, Number($('#st-qr', root).value) || 30);
+        DB.settings.geoRadius = Math.min(1000, Math.max(20, Number($('#st-radius', root).value) || 100));
+        $$('[data-place]', root).forEach(row => {
+          const pl = DB.places.find(p => p.id === row.dataset.place); if (!pl) return;
+          const v = k => row.querySelector(`[data-k="${k}"]`).value;
+          pl.name = v('name').trim() || pl.name; pl.match = v('match').trim() || pl.match;
+          const la = parseFloat(v('lat')), ln = parseFloat(v('lng')); if (!isNaN(la)) pl.lat = la; if (!isNaN(ln)) pl.lng = ln;
+        });
         DB.settings.leaveDeadline = $('#st-izin', root).value;
         DB.settings.correctionWindow = Number($('#st-corr', root).value) || 2;
         toast('Pengaturan presensi disimpan.');

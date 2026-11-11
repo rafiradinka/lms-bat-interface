@@ -50,7 +50,7 @@ const LoginPage = {
         <div class="hero-copy">
           <span class="eyebrow-pill">${icon('sparkle', 14)} Persiapan UTBK/SNBT · Yogyakarta</span>
           <h1>Satu tempat untuk <span class="grad">belajar, hadir,</span> dan berkembang bersama.</h1>
-          <p>Kelompok Kelas, jadwal sesi, materi, tugas, presensi QR Code, hingga perizinan, semuanya terintegrasi dalam satu aplikasi web komunitas BAT.</p>
+          <p>Kelompok Kelas, jadwal sesi, materi, tugas, presensi berbasis lokasi, hingga perizinan, semuanya terintegrasi dalam satu aplikasi web komunitas BAT.</p>
           <div class="value-chips"><span>Inklusif</span><span>Growth</span><span>Impact</span><span>Commitment</span></div>
         </div>
         <div class="hero-preview">
@@ -155,7 +155,7 @@ function buildShell() {
   } else {
     const b = id => PELAJAR_NAV.find(n => n.id === id);
     const it = n => `<a class="bn-item" href="#/${n.id}" data-nav="${n.id}">${icon(n.icon, 22)}<span>${n.short || n.label}</span></a>`;
-    bottom = it(b('beranda')) + it(b('kelas')) + `<a class="bn-item bn-fab" href="#/presensi" data-nav="presensi"><span class="fab">${icon('scan', 24)}</span><span>Presensi</span></a>` + it(b('tugas'));
+    bottom = it(b('beranda')) + it(b('kelas')) + `<a class="bn-item bn-fab" href="#/presensi" data-nav="presensi"><span class="fab">${icon('pin', 24)}</span><span>Presensi</span></a>` + it(b('tugas'));
   }
   $('#app').innerHTML = `
   <div class="shell">

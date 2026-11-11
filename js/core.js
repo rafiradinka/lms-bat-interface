@@ -1,5 +1,5 @@
 /* =========================================================
-   LMS BAT — Core: ikon, util, komponen UI, chart, QR, halaman bersama
+   LMS BAT — Core: ikon, util, komponen UI, chart, lokasi presensi, halaman bersama
    ========================================================= */
 
 /* ---------- Ikon (gaya garis, 24x24) ---------- */
@@ -57,6 +57,7 @@ const ICONS = {
   sparkle: '<path d="M12 3l1.9 5.8L20 10.7l-6.1 1.9L12 18.5l-1.9-5.9L4 10.7l6.1-1.9z"/>',
   swap: '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
   userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>',
+  locate: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/>',
   key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
 };
 const icon = (n, s = 18) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
@@ -160,7 +161,7 @@ const Q = {
       c.izin = Math.min(1, total - present); c.alpa = total - present - c.izin;
     }
     const total = c.hadir + c.terlambat + c.izin + c.alpa;
-    return { ...c, total, pct: total ? Math.round((c.hadir + c.terlambat) / total * 100) : 0 };
+    return { ...c, total, pct: total ? Math.round((c.hadir + c.terlambat) / total * 100) : 0, score: attScore(c) };
   },
   myTasks: sid => { const s = Q.student(sid || App.user.studentId || 'p1'); return DB.assignments.filter(a => a.my && a.groupIds.includes(s.groupId)); },
   taskAvg(studentId) {
@@ -217,6 +218,23 @@ const Q = {
   waliOf: st => (Q.grp(st.groupId) || {}).wali || '-',
   assignTotal: a => Q.studentsIn(a.groupIds).length,
 };
+
+/* Skor presensi: Hadir = 1, Terlambat = 0,5, Tidak hadir = 0.
+   Izin yang disetujui tidak dihitung (dikeluarkan dari pembagi). Hasil skala 0–100. */
+const ATT_POINT = { hadir: 1, terlambat: 0.5, alpa: 0 };
+const attScore = c => { const base = c.hadir + c.terlambat + c.alpa; return base ? Math.round((c.hadir + 0.5 * c.terlambat) / base * 100) : 0; };
+const fmtPoint = st => st in ATT_POINT ? String(ATT_POINT[st]).replace('.', ',') : '—';
+
+/* ---------- Lokasi presensi ---------- */
+/* Titik lokasi sesi: dicocokkan dari nama tempat sesi; fallback ke titik pertama */
+const placeOf = s => DB.places.find(p => s.location.toLowerCase().includes(p.match.toLowerCase())) || DB.places[0];
+/* Jarak dua koordinat (meter), rumus haversine */
+function distanceM(a, b) {
+  const R = 6371000, rad = x => x * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(h)));
+}
 
 /* Rekap presensi per sesi (dummy deterministik) */
 const _recap = {};
@@ -384,32 +402,6 @@ function barChart(data, { max, suffix = '' } = {}) {
   }).join('')}</div>`;
 }
 
-/* ---------- QR Code (visual dummy, unik per sesi & waktu) ---------- */
-function drawQR(canvas, seedStr, n = 29) {
-  const scale = 12, px = n * scale;
-  canvas.width = px; canvas.height = px;
-  const ctx = canvas.getContext('2d');
-  let h = hashStr(seedStr) || 1;
-  const r = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 1000) / 1000; };
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, px, px);
-  ctx.fillStyle = '#0b0d14';
-  const inFinder = (x, y) => (x < 8 && y < 8) || (x >= n - 8 && y < 8) || (x < 8 && y >= n - 8);
-  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-    if (inFinder(x, y)) continue;
-    const timing = (x === 6 || y === 6) ? (x + y) % 2 === 0 : r() < 0.47;
-    if (timing) ctx.fillRect(x * scale, y * scale, scale, scale);
-  }
-  const finder = (fx, fy) => {
-    ctx.fillStyle = '#0b0d14'; ctx.fillRect(fx * scale, fy * scale, 7 * scale, 7 * scale);
-    ctx.fillStyle = '#fff'; ctx.fillRect((fx + 1) * scale, (fy + 1) * scale, 5 * scale, 5 * scale);
-    ctx.fillStyle = '#6d5dfc'; ctx.fillRect((fx + 2) * scale, (fy + 2) * scale, 3 * scale, 3 * scale);
-  };
-  finder(0, 0); finder(n - 7, 0); finder(0, n - 7);
-  const c = Math.floor(n / 2) - 2;
-  ctx.fillStyle = '#fff'; ctx.fillRect(c * scale, c * scale, 5 * scale, 5 * scale);
-  ctx.fillStyle = '#6d5dfc'; ctx.beginPath(); ctx.arc((c + 2.5) * scale, (c + 2.5) * scale, 1.9 * scale, 0, Math.PI * 2); ctx.fill();
-}
-
 /* ---------- Lini masa izin ---------- */
 function leaveTimeline(l) {
   const st = Q.student(l.studentId);
@@ -464,7 +456,7 @@ function openCorrection(sessionId) {
     sub: `${sb.code} · ${s.topic} · ${fmtDay(s.date)}`,
     body: `
       <div class="alert alert-info">${icon('alert', 16)}<span>Status tercatat saat ini: <b>${r ? ATT[r.status].label : 'Belum presensi'}</b>${r && r.time ? ` (${r.time} WIB)` : ''}. Koreksi akan diproses tutor sesi atau Kurikulum.</span></div>
-      <label class="field"><span>Jenis kendala</span><select id="k-type"><option>Lupa memindai</option><option>Kendala teknis (kamera / HP)</option><option>Kesalahan pencatatan</option></select></label>
+      <label class="field"><span>Jenis kendala</span><select id="k-type"><option>Lupa presensi</option><option>Kendala GPS / lokasi</option><option>Kesalahan pencatatan</option></select></label>
       <label class="field"><span>Keterangan</span><textarea id="k-note" placeholder="Ceritakan singkat kendala yang kamu alami…"></textarea><small class="field-err"></small></label>
       <div class="field"><span>Bukti pendukung (opsional)</span>${dropzone('k-file', 'Foto / tangkapan layar')}</div>`,
     footer: `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="k-send">${icon('send', 16)} Kirim koreksi</button>`,
@@ -511,7 +503,7 @@ Shared.groupDetail = (id, isPanitia) => {
     <h1>${esc(g.name)}</h1>
     <p>Wali Kelas <b>${esc(g.wali)}</b> · ${members.length} pelajar · ${subs.length} mata pelajaran</p>
     <div class="hero-actions">
-      ${!isPanitia && todaySess.length ? `<a class="btn btn-primary" href="#/presensi">${icon('scan', 16)} Presensi sesi hari ini</a>` : ''}
+      ${!isPanitia && todaySess.length ? `<a class="btn btn-primary" href="#/sesi/${todaySess[0].id}">${icon('arrowRight', 16)} Masuk Kelas hari ini</a>` : ''}
       ${canPlace ? `<button class="btn btn-ghost" data-act="edit-group" data-id="${g.id}">${icon('edit', 16)} Ubah kelompok</button><button class="btn btn-ghost" data-act="add-member" data-id="${g.id}">${icon('userPlus', 16)} Tambah anggota</button>` : ''}
       ${canPost ? `<button class="btn btn-ghost" data-act="announce" data-id="${g.id}">${icon('megaphone', 16)} Buat pengumuman</button>` : ''}
     </div>

@@ -1,7 +1,7 @@
 /* =========================================================
    LMS BAT — Room Pertemuan (dipakai Panitia & Pelajar)
    Setiap sesi di Manajemen Jadwal otomatis menjadi satu room: #/sesi/<id>
-   Isi room: Presensi (QR / tombol Hadir) · Materi · Tugas & Kuis.
+   Isi room: Presensi (tombol lokasi, dibuka tutor) · Materi · Tugas & Kuis.
    Setelah sesi selesai, room tetap bisa dibuka sebagai arsip dari jadwal.
    Prototipe: semua data di memori browser (DB), tanpa backend.
    ========================================================= */
@@ -13,7 +13,7 @@ const Room = {
   navAs: 'jadwal',
 
   /* ---------- Helper data ---------- */
-  state(s) { return DB.rooms[s.id] || (DB.rooms[s.id] = { open: false, closed: false, code: '', attendees: [], openedAt: '', closedAt: '' }); },
+  state(s) { return DB.rooms[s.id] || (DB.rooms[s.id] = { open: false, closed: false, attendees: [], openedAt: '', closedAt: '' }); },
   canAccess(s) {
     if (!s) return false;
     if (!App.isPanitia) { const me = Q.me(); return !!me && s.groupId === me.groupId; }
@@ -22,22 +22,24 @@ const Room = {
   canManage: s => App.isPanitia && Q.canRunSession(s),
   meetingNo: s => DB.sessions.filter(x => x.groupId === s.groupId && x.subjectId === s.subjectId).indexOf(s) + 1,
   phase(s) { return Q.state(s).key === 'selesai' ? 'arsip' : s.date === todayStr() ? 'hari-h' : 'mendatang'; },
-  statusAt: (s, time) => toMin(time) <= toMin(s.start) + DB.settings.lateTolerance ? 'hadir' : 'terlambat',
+  /* Keterlambatan dihitung dari jam presensi DIBUKA tutor (+ toleransi); sesi lampau tanpa room memakai jam mulai */
+  openTime(s) { const o = this.state(s).openedAt; return o ? o.split(' ')[1] : s.start; },
+  deadline(s) { return DB.addMin(this.openTime(s), DB.settings.lateTolerance); },
+  statusAt(s, time) { return toMin(time) <= toMin(this.deadline(s)) ? 'hadir' : 'terlambat'; },
   leaveOk: (s, sid) => DB.leaves.some(l => l.sessionId === s.id && l.studentId === sid && l.status === 'disetujui'),
   record: (s, sid) => (DB.attendance[sid] || {})[s.id],
   mats: s => DB.materials.filter(m => m.sessionId === s.id).sort((a, b) => b.date.localeCompare(a.date)),
   tasks: s => DB.assignments.filter(a => a.sessionId === s.id),
-  newCode(rm) { rm.code = 'BAT-' + Math.random().toString(36).slice(2, 6).toUpperCase() + '-' + Math.floor(Math.random() * 90 + 10); },
 
   /* Daftar hadir per pelajar.
      Room yang dibuka/ditutup → dari daftar hadir langsung; sesi lampau tanpa room → rekap dummy deterministik. */
   roster(s) {
     const members = Q.studentsOf(s.groupId), rm = this.state(s);
-    const ov = st => { const r = this.record(s, st.id); return r ? { st, status: r.status, time: r.time, via: 'QR' } : this.leaveOk(s, st.id) ? { st, status: 'izin' } : null; };
+    const ov = st => { const r = this.record(s, st.id); return r ? { st, status: r.status, time: r.time, via: r.status === 'izin' ? 'Izin disetujui' : 'Lokasi GPS' } : this.leaveOk(s, st.id) ? { st, status: 'izin', via: 'Izin disetujui' } : null; };
     if (rm.open || rm.closed) return members.map(st => {
       const a = rm.attendees.find(x => x.id === st.id);
       if (a) return { st, status: a.status, time: a.time, via: a.via };
-      if (this.leaveOk(s, st.id)) return { st, status: 'izin' };
+      if (this.leaveOk(s, st.id)) return { st, status: 'izin', via: 'Izin disetujui' };
       return { st, status: rm.closed ? 'alpa' : null };
     });
     if (this.phase(s) === 'arsip') {
@@ -48,7 +50,7 @@ const Room = {
       return members.map(st => {
         const o = ov(st); if (o) return o;
         const k = map[st.id] || 'hadir', h = hashStr(st.id + s.id);
-        return { st, status: k, time: k === 'hadir' ? DB.addMin(s.start, -(h % 9)) : k === 'terlambat' ? DB.addMin(s.start, DB.settings.lateTolerance + 2 + h % 14) : null, via: ['hadir', 'terlambat'].includes(k) ? 'QR' : '' };
+        return { st, status: k, time: k === 'hadir' ? DB.addMin(s.start, -(h % 9)) : k === 'terlambat' ? DB.addMin(s.start, DB.settings.lateTolerance + 2 + h % 14) : null, via: ['hadir', 'terlambat'].includes(k) ? 'Lokasi GPS' : k === 'izin' ? 'Izin disetujui' : '' };
       });
     }
     return members.map(st => ov(st) || { st, status: null });
@@ -56,7 +58,7 @@ const Room = {
   tally(list) {
     const c = { hadir: 0, terlambat: 0, izin: 0, alpa: 0, belum: 0 };
     list.forEach(r => { c[r.status || 'belum']++; });
-    return { ...c, total: list.length, present: c.hadir + c.terlambat };
+    return { ...c, total: list.length, present: c.hadir + c.terlambat, score: attScore(c) };
   },
 
   /* ---------- Render ---------- */
@@ -94,7 +96,7 @@ const Room = {
     </div>
     <div data-tab-scope>
       <div class="tabs" data-tabs="room" style="max-width:max-content">
-        <button class="tab ${tabCls('room', 'presensi', true)}" data-tab="presensi">${icon('qr', 16)} Presensi ${rm.open ? '<span class="live-dot" style="margin-left:4px"></span>' : ''}</button>
+        <button class="tab ${tabCls('room', 'presensi', true)}" data-tab="presensi">${icon('locate', 16)} Presensi ${rm.open ? '<span class="live-dot" style="margin-left:4px"></span>' : ''}</button>
         <button class="tab ${tabCls('room', 'materi')}" data-tab="materi">${icon('file', 16)} Materi <span class="muted">${mats.length}</span></button>
         <button class="tab ${tabCls('room', 'tugas')}" data-tab="tugas">${icon('clipboard', 16)} Tugas & Kuis <span class="muted">${tasks.length}</span></button>
       </div>
@@ -105,36 +107,46 @@ const Room = {
   },
 
   /* ---------- Presensi: panitia ---------- */
+  geoInfo(s) {
+    const pl = placeOf(s);
+    return `<div class="kv">
+      <div><span>Titik lokasi</span><b>${esc(pl.name)}</b></div>
+      <div><span>Radius area</span><b>${DB.settings.geoRadius} meter</b></div>
+      <div><span>Toleransi terlambat</span><b>${DB.settings.lateTolerance} menit setelah presensi dibuka</b></div>
+    </div>`;
+  },
   presensiPanitia(s, manage, roster) {
     const rm = this.state(s), phase = this.phase(s);
     if (rm.open) return `<div class="cols cols-1-1">
-      ${manage ? `<div class="card fullscreen-qr" id="rq-card">
-        <div class="card-head"><h3><span class="live-dot"></span> Presensi dibuka</h3><button class="icon-btn" data-r="full" title="Layar penuh">${icon('expand', 18)}</button></div>
-        <div class="qr-stage">
-          <div class="qr-frame"><canvas id="rq-canvas" aria-label="QR Code presensi"></canvas></div>
-          <div class="qr-code" id="rq-code">${esc(rm.code)}</div>
-          <div class="qr-timer"><span>QR diperbarui dalam <b id="rq-sec">${DB.settings.qrRefresh}</b> dtk</span><div class="progress thin"><span id="rq-bar" style="width:100%"></span></div></div>
-          <p class="muted small" style="text-align:center">Pelajar di room ini dapat memindai QR atau menekan tombol <b>Hadir</b>. Batas tepat waktu ${DB.addMin(s.start, DB.settings.lateTolerance)} WIB.</p>
-          <div class="row wrap" style="justify-content:center"><button class="btn btn-ghost" data-r="qr">${icon('refresh', 16)} Perbarui QR</button><button class="btn btn-danger" data-r="close">${icon('xCircle', 16)} Tutup presensi</button></div>
+      <div class="card">
+        <div class="card-head"><h3><span class="live-dot"></span> Presensi dibuka</h3>${badge('Berbasis lokasi', 'primary', 'no-dot')}</div>
+        <div class="geo-stage">
+          <div class="geo-ring"><span>${icon('locate', 34)}</span></div>
+          <div class="kv-inline"><div><span>Dibuka</span><b>${this.openTime(s)} WIB</b></div><div><span>Batas tepat waktu</span><b>${this.deadline(s)} WIB</b></div></div>
         </div>
-      </div>` : `<div class="card">${emptyState('eye', 'Presensi sedang berlangsung', `Dibuka oleh ${esc(s.tutor)} / Kurikulum. Kamu dapat memantau daftar hadir.`)}</div>`}
+        ${this.geoInfo(s)}
+        <p class="muted small" style="margin:12px 0">Pelajar menekan tombol <b>Presensi dengan lokasi</b> di room ini dan harus berada di dalam radius area. Lewat dari batas tepat waktu tercatat <b>Terlambat</b>. Pelajar dengan izin yang sudah disetujui otomatis tercatat <b>Izin</b>.</p>
+        ${manage ? `<button class="btn btn-danger btn-block" data-r="close">${icon('xCircle', 16)} Tutup presensi</button>` : `<div class="note info" style="margin:0">${icon('eye', 15)}<span>Kamu memantau. Presensi dikelola tutor sesi atau Kurikulum.</span></div>`}
+      </div>
       <div class="card" id="rm-live">${this.liveList(s, manage)}</div>
     </div>`;
     let head = '';
     if (phase === 'hari-h' && !rm.closed) head = manage
-      ? `<div class="card" style="margin-bottom:16px"><div class="row-between wrap" style="gap:12px"><div><b>Presensi belum dibuka</b><p class="muted small" style="margin-top:4px">Buka presensi saat kelas dimulai untuk menampilkan QR Code. Pelajar juga dapat menekan tombol Hadir di room ini.</p></div><button class="btn btn-primary" data-r="open">${icon('qr', 16)} Buka presensi & tampilkan QR</button></div></div>`
+      ? `<div class="card" style="margin-bottom:16px"><div class="row-between wrap" style="gap:12px"><div><b>Presensi belum dibuka</b><p class="muted small" style="margin-top:4px">Pelajar baru dapat presensi setelah kamu membukanya. Batas tepat waktu = jam dibuka + ${DB.settings.lateTolerance} menit. Titik lokasi: ${esc(placeOf(s).name)} (radius ${DB.settings.geoRadius} m).</p></div><button class="btn btn-primary" data-r="open">${icon('locate', 16)} Buka presensi</button></div></div>`
       : `<div class="note info" style="margin:0 0 16px">${icon('clock', 15)}<span>Presensi belum dibuka oleh tutor sesi.</span></div>`;
-    if (phase === 'mendatang') head = `<div class="note info" style="margin:0 0 16px">${icon('calendar', 15)}<span>Presensi dapat dibuka pada hari H (${fmtDay(s.date)}, ${s.start} WIB).</span></div>`;
-    if (rm.closed) head = `<div class="note success" style="margin:0 0 16px">${icon('checkCircle', 15)}<span>Presensi ditutup ${rm.closedAt ? fmtStamp(rm.closedAt) : ''}. Pelajar tanpa presensi & tanpa izin tercatat <b>Tidak hadir</b>.</span></div>`;
+    if (phase === 'mendatang') head = `<div class="note info" style="margin:0 0 16px">${icon('calendar', 15)}<span>Presensi dapat dibuka tutor pada hari H (${fmtDay(s.date)}, ${s.start} WIB).</span></div>`;
+    if (rm.closed) head = `<div class="note success" style="margin:0 0 16px">${icon('checkCircle', 15)}<span>Presensi dibuka ${this.openTime(s)} dan ditutup ${rm.closedAt ? rm.closedAt.split(' ')[1] : ''} WIB. Pelajar tanpa presensi & tanpa izin tercatat <b>Tidak hadir</b>.</span></div>`;
     return head + this.recapTable(s, roster);
   },
   liveList(s, manage) {
     const roster = this.roster(s), t = this.tally(roster), rm = this.state(s);
     const order = rm.attendees.map(a => roster.find(r => r.st.id === a.id)).filter(Boolean).reverse();
+    const izin = roster.filter(r => r.status === 'izin');
     const notYet = roster.filter(r => !r.status);
     return `<div class="card-head"><h3>${icon('users', 16)} Daftar hadir <span class="live-dot" style="margin-left:4px"></span></h3><span class="muted small">Real-time</span></div>
       <div class="live-stats"><div><b style="color:var(--success)">${t.hadir}</b><span>Hadir</span></div><div><b style="color:var(--warning)">${t.terlambat}</b><span>Terlambat</span></div><div><b>${t.belum}</b><span>Belum</span></div></div>
-      <div class="live-list list">${order.length ? order.map(r => this.personRow(r)).join('') : emptyState('scan', 'Menunggu pelajar…', 'Nama pelajar muncul otomatis saat presensi.')}</div>
+      <div class="live-list list">${order.length ? order.map(r => this.personRow(r)).join('') : emptyState('locate', 'Menunggu pelajar…', 'Nama pelajar muncul otomatis saat presensi dari lokasi.')}
+        ${izin.map(r => this.personRow(r)).join('')}</div>
       ${notYet.length ? `<details style="margin-top:12px"><summary class="small" style="cursor:pointer;color:var(--primary);font-weight:700">Belum presensi (${notYet.length})${manage ? ' · tandai manual' : ''}</summary>
         <div class="list" style="margin-top:8px">${notYet.map(r => `<div class="item">${avatar(r.st.name, 'xs')}<div class="item-body"><div class="item-title">${esc(r.st.name)}</div></div>${manage ? `<button class="btn btn-sm btn-ghost" data-manual="${r.st.id}">Tandai hadir</button>` : ''}</div>`).join('')}</div></details>` : ''}`;
   },
@@ -142,37 +154,41 @@ const Room = {
   recapTable(s, roster) {
     const t = this.tally(roster);
     return `<div class="card">
-      <div class="card-head"><h3>Rekap kehadiran pertemuan</h3><span class="muted small">${t.present} dari ${t.total} pelajar hadir</span></div>
+      <div class="card-head"><h3>Rekap kehadiran pertemuan</h3><span class="muted small">${t.present} dari ${t.total} pelajar hadir · skor ${t.score}</span></div>
       <div class="row wrap" style="gap:8px;margin-bottom:12px">${badge(`${t.hadir} hadir`, 'success')}${badge(`${t.terlambat} terlambat`, 'warning')}${badge(`${t.izin} izin`, 'info')}${badge(`${t.alpa} tidak hadir`, 'danger')}${t.belum ? badge(`${t.belum} belum`, 'neutral') : ''}</div>
-      <div class="table-wrap"><table><thead><tr><th>Pelajar</th><th>Status</th><th>Waktu</th><th>Cara</th></tr></thead><tbody>
-        ${roster.map(r => `<tr><td><div class="cell-user">${avatar(r.st.name, 'sm')}<div><b>${esc(r.st.name)}</b></div></div></td><td>${r.status ? badge(ATT[r.status].label, ATT[r.status].tone) : badge('Belum', 'neutral')}</td><td>${r.time ? r.time + ' WIB' : '—'}</td><td class="muted small">${esc(r.via || (r.status === 'izin' ? 'Izin disetujui' : '—'))}</td></tr>`).join('') || `<tr><td colspan="4">${emptyState('users', 'Belum ada anggota')}</td></tr>`}
+      <div class="table-wrap"><table><thead><tr><th>Pelajar</th><th>Status</th><th>Waktu</th><th>Keterangan</th><th>Poin</th></tr></thead><tbody>
+        ${roster.map(r => `<tr><td><div class="cell-user">${avatar(r.st.name, 'sm')}<div><b>${esc(r.st.name)}</b></div></div></td><td>${r.status ? badge(ATT[r.status].label, ATT[r.status].tone) : badge('Belum', 'neutral')}</td><td>${r.time ? r.time + ' WIB' : '—'}</td><td class="muted small">${esc(r.via || '—')}</td><td><b>${r.status ? fmtPoint(r.status) : '—'}</b></td></tr>`).join('') || `<tr><td colspan="5">${emptyState('users', 'Belum ada anggota')}</td></tr>`}
       </tbody></table></div>
+      <p class="muted small" style="margin-top:10px">Poin presensi: Hadir 1 · Terlambat 0,5 · Tidak hadir 0 · Izin tidak dihitung.</p>
     </div>`;
   },
 
-  /* ---------- Presensi: pelajar ---------- */
+  /* ---------- Presensi: pelajar (tombol lokasi) ---------- */
   presensiPelajar(s, mine, t) {
     const rm = this.state(s), phase = this.phase(s);
     let main;
-    if (mine && mine.status && mine.status !== 'alpa' || (mine && mine.status === 'alpa' && phase === 'arsip')) {
+    if (mine && mine.status && (mine.status !== 'alpa' || phase === 'arsip' || rm.closed)) {
       const m = ATT[mine.status];
       main = `<div class="scan-success"><div class="success-ic t-${m.tone}">${icon(mine.status === 'alpa' ? 'xCircle' : mine.status === 'izin' ? 'clipboard' : 'check', 36)}</div>
         <h3>${mine.status === 'izin' ? 'Izin disetujui' : mine.status === 'alpa' ? 'Tidak hadir' : 'Presensi tercatat!'}</h3>
-        <div class="kv-inline"><div><span>Waktu</span><b>${mine.time ? mine.time + ' WIB' : '—'}</b></div><div><span>Status</span>${badge(m.label, m.tone)}</div></div>
+        ${mine.status === 'izin' ? '<p class="muted">Pengajuan izinmu untuk pertemuan ini sudah disetujui, jadi kehadiranmu otomatis tercatat Izin.</p>' : ''}
+        <div class="kv-inline"><div><span>Waktu</span><b>${mine.time ? mine.time + ' WIB' : '—'}</b></div><div><span>Status</span>${badge(m.label, m.tone)}</div><div><span>Poin</span><b>${fmtPoint(mine.status)}</b></div></div>
+        ${mine.via && mine.status !== 'izin' ? `<p class="muted small">${esc(mine.via)}</p>` : ''}
         ${['alpa', 'terlambat'].includes(mine.status) ? `<p class="muted small">Ada kesalahan pencatatan? <button class="link" style="color:var(--primary);font-weight:700" data-correct="${s.id}">Ajukan koreksi</button></p>` : ''}</div>`;
-    } else if (rm.closed) {
-      main = emptyState('xCircle', 'Presensi sudah ditutup', 'Kamu tercatat tidak hadir pada pertemuan ini.', `<button class="btn btn-sm btn-ghost" data-correct="${s.id}">Ajukan koreksi</button>`);
     } else if (rm.open) {
-      main = `<div style="text-align:center;padding:12px 0">
-        <div class="success-ic t-primary">${icon('qr', 36)}</div>
+      const pl = placeOf(s);
+      main = `<div class="geo-stage">
+        <div class="geo-ring"><span>${icon('locate', 34)}</span></div>
         <h3 style="font-size:19px;font-weight:800">Presensi sedang dibuka</h3>
-        <p class="muted" style="margin:6px 0 16px">Tekan <b>Hadir</b> atau pindai QR Code yang ditampilkan tutor. Batas tepat waktu pukul <b>${DB.addMin(s.start, DB.settings.lateTolerance)}</b> WIB.</p>
-        <div class="row wrap" style="justify-content:center"><button class="btn btn-primary btn-lg" data-r="hadir">${icon('checkCircle', 18)} Hadir</button><button class="btn btn-ghost btn-lg" data-r="scan">${icon('scan', 18)} Pindai QR</button></div>
+        <p class="muted" style="text-align:center">Pastikan kamu berada di <b>${esc(pl.name)}</b> (radius ${DB.settings.geoRadius} m), lalu tekan tombol di bawah. Batas tepat waktu pukul <b>${this.deadline(s)}</b> WIB.</p>
+        <button class="btn btn-primary btn-lg" data-r="geo">${icon('locate', 18)} Presensi dengan lokasi saya</button>
+        <div id="geo-msg" aria-live="polite"></div>
+        <div class="demo-geo"><span class="muted small">Demo tanpa GPS:</span><button class="btn btn-sm btn-ghost" data-r="sim-in">Simulasi di lokasi</button><button class="btn btn-sm btn-ghost" data-r="sim-out">Simulasi di luar area</button></div>
       </div>`;
     } else if (phase === 'hari-h') {
-      main = emptyState('clock', 'Menunggu tutor membuka presensi', `Tombol Hadir akan muncul di sini setelah ${esc(s.tutor)} membuka presensi.`);
+      main = emptyState('clock', 'Menunggu tutor membuka presensi', `Tombol presensi lokasi akan muncul setelah ${esc(s.tutor)} membuka presensi.`);
     } else {
-      main = emptyState('calendar', 'Presensi dibuka di hari H', `${fmtDay(s.date)}, ${s.start} WIB. Tidak bisa hadir?`, `<a class="btn btn-sm btn-ghost" href="#/izin">Ajukan izin</a>`);
+      main = emptyState('calendar', 'Presensi dibuka di hari H', `${fmtDay(s.date)}, ${s.start} WIB, setelah tutor membuka presensi. Tidak bisa hadir?`, `<a class="btn btn-sm btn-ghost" href="#/izin">Ajukan izin</a>`);
     }
     return `<div class="cols cols-3-2">
       <div class="card">${main}</div>
@@ -183,7 +199,8 @@ const Room = {
           <div><span>${badge('Izin', 'info')}</span><b>${t.izin}</b></div>
           <div><span>${badge('Tidak hadir', 'danger')}</span><b>${t.alpa}</b></div>
           ${t.belum ? `<div><span>${badge('Belum presensi', 'neutral')}</span><b>${t.belum}</b></div>` : ''}
-        </div></div>
+        </div>
+        <p class="muted small" style="margin-top:10px">Poin: Hadir 1 · Terlambat 0,5 · Tidak hadir 0.</p></div>
     </div>`;
   },
 
@@ -256,35 +273,34 @@ const Room = {
       if (se) { const a = DB.assignments.find(x => x.id === se.dataset.see); return a.kind === 'kuis' ? this.quizResult(a) : PelajarPages.tugas.viewModal(a.id); }
       const mn = t.closest('[data-manual]');
       if (mn && manage) {
-        const st = Q.student(mn.dataset.manual);
-        this.addAttendee(s, { id: st.id, time: nowHM(), status: 'hadir', via: 'Ditandai manual' });
-        DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Menandai manual ${st.name} → Hadir (${this.label(s)})` });
-        toast(`${esc(st.name)} ditandai hadir.`);
+        const st = Q.student(mn.dataset.manual), time = nowHM();
+        this.addAttendee(s, { id: st.id, time, status: this.statusAt(s, time), via: 'Ditandai manual' });
+        DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Menandai manual ${st.name} → ${ATT[this.statusAt(s, time)].label} (${this.label(s)})` });
+        toast(`${esc(st.name)} ditandai ${ATT[this.statusAt(s, time)].label.toLowerCase()}.`);
         const box = $('#rm-live', root); if (box) box.innerHTML = this.liveList(s, manage);
         return;
       }
       const r = t.closest('[data-r]'); if (!r) return;
       const act = r.dataset.r;
       if (act === 'open' && manage) {
-        Object.assign(rm, { open: true, closed: false, openedAt: stamp() }); this.newCode(rm);
+        Object.assign(rm, { open: true, closed: false, openedAt: stamp() });
         DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Membuka presensi ${this.label(s)}` });
         TabMemory.room = 'presensi';
-        toast('Presensi dibuka. Tampilkan QR ke pelajar.'); return App.refresh();
+        toast(`Presensi dibuka. Batas tepat waktu ${this.deadline(s)} WIB.`); return App.refresh();
       }
       if (act === 'close' && manage) return this.close(s);
-      if (act === 'qr') { this.newCode(rm); this.drawQR(root, s); return toast('QR Code diperbarui.', 'info'); }
-      if (act === 'full') { const el = $('#rq-card', root); if (document.fullscreenElement) document.exitFullscreen(); else if (el.requestFullscreen) el.requestFullscreen(); return; }
-      if (act === 'hadir' || act === 'scan') return this.checkIn(r, s, act === 'scan' ? 'Pindai QR' : 'Tombol Hadir');
+      if (act === 'geo') return this.geoCheckIn(root, r, s);
+      if (act === 'sim-in' || act === 'sim-out') {
+        // Demo: posisi dibuat di sekitar titik lokasi (±40 m) atau jauh di luar area (±1,5 km)
+        const pl = placeOf(s), off = act === 'sim-in' ? 0.00035 : 0.014;
+        return this.checkIn(root, r, s, { lat: pl.lat + off * (Math.random() - .3), lng: pl.lng + off * (Math.random() - .3) }, true);
+      }
       if (act === 'upload') return this.upload(root, s, upFile);
       if (act === 'task') return this.taskModal(s);
       if (act === 'quiz') return this.quizBuilder(s);
     });
   },
   label(s) { return `${Q.grp(s.groupId).name} · ${Q.subj(s.subjectId).code} (${s.topic})`; },
-  drawQR(root, s) {
-    const c = $('#rq-canvas', root); if (!c) return;
-    drawQR(c, this.state(s).code + s.id); $('#rq-code', root).textContent = this.state(s).code;
-  },
   /* Simpan kehadiran ke room + catatan presensi pelajar yang punya riwayat nyata */
   addAttendee(s, a) {
     const rm = this.state(s);
@@ -292,17 +308,9 @@ const Room = {
     rm.attendees.push(a);
     if (DB.attendance[a.id]) DB.attendance[a.id][s.id] = { status: a.status, time: a.time };
   },
+  /* Simulasi pelajar lain presensi dari lokasi (akun demo pelajar tidak disimulasikan agar bisa dicoba sendiri) */
   startLive(root, s) {
     const rm = this.state(s);
-    this.drawQR(root, s);
-    let sec = DB.settings.qrRefresh;
-    const timer = setInterval(() => {
-      sec--;
-      if (sec <= 0) { sec = DB.settings.qrRefresh; this.newCode(rm); this.drawQR(root, s); }
-      const el = $('#rq-sec', root); if (el) el.textContent = sec;
-      const bar = $('#rq-bar', root); if (bar) bar.style.width = (sec / DB.settings.qrRefresh * 100) + '%';
-    }, 1000);
-    // Simulasi pelajar lain memindai QR (akun demo pelajar tidak disimulasikan agar bisa dicoba sendiri)
     const demoIds = DB.accounts.filter(a => a.studentId).map(a => a.studentId);
     const members = Q.studentsOf(s.groupId);
     let simT;
@@ -312,12 +320,12 @@ const Room = {
       if (left.length <= 1) return;
       const st = left[Math.floor(Math.random() * left.length)];
       const late = rm.attendees.length > members.length * 0.65 && Math.random() < 0.6;
-      this.addAttendee(s, { id: st.id, time: nowHM(), status: late ? 'terlambat' : this.statusAt(s, nowHM()), via: Math.random() < 0.7 ? 'Pindai QR' : 'Tombol Hadir' });
+      this.addAttendee(s, { id: st.id, time: nowHM(), status: late ? 'terlambat' : this.statusAt(s, nowHM()), via: `Lokasi GPS · ${8 + Math.floor(Math.random() * 70)} m dari titik` });
       const box = $('#rm-live', root); if (box) box.innerHTML = this.liveList(s, true);
       simT = setTimeout(sim, 1800 + Math.random() * 2600);
     };
     simT = setTimeout(sim, 1500);
-    Cleanup.add(() => { clearInterval(timer); clearTimeout(simT); });
+    Cleanup.add(() => clearTimeout(simT));
   },
   close(s) {
     const rm = this.state(s);
@@ -327,22 +335,38 @@ const Room = {
     // Rekap sesi mengikuti hasil presensi nyata (dipakai dashboard & laporan)
     _recap[s.id] = { hadir: t.hadir, terlambat: t.terlambat, izin: t.izin, alpa: t.alpa, total: t.total, pct: t.total ? Math.round(t.present / t.total * 100) : 0 };
     DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Menutup presensi ${this.label(s)} (${t.present}/${t.total} hadir)` });
-    DB.activity.unshift({ who: App.user.name, what: 'menutup presensi', obj: `${Q.grp(s.groupId).name} · ${Q.subj(s.subjectId).code}`, at: stamp(), icon: 'qr' });
+    DB.activity.unshift({ who: App.user.name, what: 'menutup presensi', obj: `${Q.grp(s.groupId).name} · ${Q.subj(s.subjectId).code}`, at: stamp(), icon: 'locate' });
     toast(`Presensi ditutup. ${t.alpa} pelajar tanpa presensi & izin tercatat “Tidak hadir”.`, 'info');
     App.refresh();
   },
-  checkIn(btn, s, via) {
-    const me = Q.me(), rm = this.state(s);
+  /* Ambil posisi GPS asli dari browser */
+  geoCheckIn(root, btn, s) {
+    const msg = html => { const el = $('#geo-msg', root); if (el) el.innerHTML = html; };
+    if (!navigator.geolocation) return msg(`<div class="note warning">${icon('alert', 15)}<span>Browser tidak mendukung GPS. Gunakan tombol simulasi.</span></div>`);
+    btn.classList.add('loading'); msg(`<p class="muted small">Mengambil lokasi…</p>`);
+    navigator.geolocation.getCurrentPosition(
+      pos => this.checkIn(root, btn, s, { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: Math.round(pos.coords.accuracy) }, false),
+      err => { btn.classList.remove('loading'); msg(`<div class="note warning">${icon('alert', 15)}<span>${err.code === 1 ? 'Izin lokasi ditolak. Aktifkan izin lokasi di browser' : 'Lokasi tidak dapat ditemukan'}, atau gunakan tombol simulasi.</span></div>`); },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+  },
+  /* Validasi jarak ke titik lokasi, lalu catat Hadir/Terlambat */
+  checkIn(root, btn, s, pos, simulated) {
+    const me = Q.me(), rm = this.state(s), pl = placeOf(s);
     if (!rm.open) return toast('Presensi belum dibuka.', 'error');
-    btn.classList.add('loading');
-    setTimeout(() => {
-      const time = nowHM(), status = this.statusAt(s, time);
-      this.addAttendee(s, { id: me.id, time, status, via });
-      Q.attOf(me.id)[s.id] = { status, time };
-      DB.audit.unshift({ who: me.name, at: stamp(), what: `Presensi ${via} ${this.label(s)} → ${ATT[status].label}` });
-      toast(status === 'hadir' ? 'Presensi berhasil! Status: Hadir.' : 'Presensi tercatat dengan status Terlambat.', status === 'hadir' ? 'success' : 'warning');
-      App.refresh();
-    }, via === 'Pindai QR' ? 1400 : 500);
+    const dist = distanceM(pos, pl);
+    btn.classList.remove('loading');
+    if (dist > DB.settings.geoRadius) {
+      const el = $('#geo-msg', root);
+      if (el) el.innerHTML = `<div class="note danger">${icon('xCircle', 15)}<span>Kamu berada <b>${dist >= 1000 ? (dist / 1000).toFixed(1).replace('.', ',') + ' km' : dist + ' m'}</b> dari ${esc(pl.name)}. Presensi hanya bisa dilakukan di dalam radius ${DB.settings.geoRadius} m.</span></div>`;
+      return toast('Di luar area lokasi presensi.', 'error');
+    }
+    const time = nowHM(), status = this.statusAt(s, time);
+    const via = `Lokasi GPS${simulated ? ' (simulasi)' : ''} · ${dist} m dari titik`;
+    this.addAttendee(s, { id: me.id, time, status, via });
+    Q.attOf(me.id)[s.id] = { status, time };
+    DB.audit.unshift({ who: me.name, at: stamp(), what: `Presensi lokasi ${this.label(s)} → ${ATT[status].label} (${dist} m)` });
+    toast(status === 'hadir' ? 'Presensi berhasil! Status: Hadir.' : 'Presensi tercatat dengan status Terlambat.', status === 'hadir' ? 'success' : 'warning');
+    App.refresh();
   },
   upload(root, s, file) {
     const type = $('#rm-type', root).value, title = $('#rm-title', root).value.trim(), url = $('#rm-url', root).value.trim();

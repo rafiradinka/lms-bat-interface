@@ -263,12 +263,17 @@ const DB = (() => {
   if (n5) addLeave({ id: 'L6', studentId: 'p5', sessionId: n5.id, reason: 'Sakit', note: 'Pemulihan pasca operasi gigi bungsu.', file: 'Surat_Dokter_Gigi.pdf', createdAt: `${D(-1)} 09:30`, status: 'kurikulum',
     waliRec: 'Direkomendasikan', waliNote: 'Surat dokter valid.', waliBy: 'Wulan Sari', waliAt: `${D(-1)} 13:45` });
   if (n6) addLeave({ id: 'L7', studentId: 'p7', sessionId: n6.id, reason: 'Kendala transportasi', note: 'Motor sedang diservis, belum ada tumpangan.', file: null, createdAt: `${D(0)} 06:58`, status: 'wali' });
+  // Izin H-1 yang sudah disetujui untuk sesi hari ini → otomatis tercatat "Izin" di rekap room
+  const tdG1 = sessions.find(s => s.groupId === 'g1' && s.date === T);
+  if (tdG1) addLeave({ id: 'L8', studentId: 'p6', sessionId: tdG1.id, reason: 'Sakit', note: 'Rawat jalan pasca demam berdarah, surat dokter terlampir.', file: 'Surat_Dokter_Yoga.pdf', createdAt: `${D(-1)} 16:10`, status: 'disetujui',
+    waliRec: 'Direkomendasikan', waliNote: 'Orang tua sudah mengonfirmasi.', waliBy: 'Fajar Nugroho', waliAt: `${D(-1)} 18:00`,
+    decisionNote: 'Disetujui. Semoga lekas pulih.', decisionBy: 'Anindya Kirana', decisionAt: `${D(-1)} 19:30` });
 
   /* ---------- Koreksi presensi & audit ---------- */
   const corrections = [];
   const pc1 = pastOf('g1', 0), pc2 = pastOf('g2', 0);
-  if (pc1) corrections.push({ id: 'k1', studentId: 'p3', sessionId: pc1.id, type: 'Lupa memindai', note: 'Saya hadir tapi lupa scan karena HP mati.', at: `${pc1.date} 18:20`, status: 'pending' });
-  if (pc2) corrections.push({ id: 'k2', studentId: 'p10', sessionId: pc2.id, type: 'Kendala teknis', note: 'Kamera HP tidak bisa membaca QR karena layar retak.', at: `${pc2.date} 18:05`, status: 'pending' });
+  if (pc1) corrections.push({ id: 'k1', studentId: 'p3', sessionId: pc1.id, type: 'Lupa presensi', note: 'Saya hadir tapi lupa menekan tombol presensi karena HP mati.', at: `${pc1.date} 18:20`, status: 'pending' });
+  if (pc2) corrections.push({ id: 'k2', studentId: 'p10', sessionId: pc2.id, type: 'Kendala GPS / lokasi', note: 'GPS HP tidak akurat sehingga terbaca di luar area padahal sudah di ruang kelas.', at: `${pc2.date} 18:05`, status: 'pending' });
 
   const audit = [
     { who: 'Dimas Prasetyo', at: `${D(-1)} 17:05`, what: 'Membuka & menutup sesi presensi Saintek A · PK' },
@@ -317,16 +322,22 @@ const DB = (() => {
     ],
     panitia: [
       { title: '3 pengajuan izin menunggu', text: 'Butuh verifikasi atau keputusan', at: `${D(0)} 07:45`, unread: true, icon: 'clipboard' },
-      { title: '2 pengajuan koreksi presensi', text: 'Lupa memindai & kendala teknis', at: `${D(-1)} 21:05`, unread: true, icon: 'qr' },
+      { title: '2 pengajuan koreksi presensi', text: 'Lupa presensi & kendala GPS', at: `${D(-1)} 21:05`, unread: true, icon: 'qr' },
       { title: 'Tugas belum dinilai', text: 'Rangkuman Turunan & Aplikasinya', at: `${D(-1)} 23:59`, unread: false, icon: 'file' },
     ],
   };
 
-  const settings = { lateTolerance: 15, qrRefresh: 30, leaveDeadline: 'H-1', correctionWindow: 2 };
+  /* Presensi berbasis lokasi: toleransi terlambat dihitung dari jam presensi DIBUKA tutor.
+     Titik lokasi tempat sesi (dummy, sekitar Yogyakarta); sesi dicocokkan lewat kata kunci pada nama tempat. */
+  const settings = { lateTolerance: 15, geoRadius: 100, leaveDeadline: 'H-1', correctionWindow: 2 };
+  const places = [
+    { id: 'pl1', name: 'Sekretariat BAT', match: 'Sekretariat BAT', lat: -7.7713, lng: 110.3775 },
+    { id: 'pl2', name: 'Perpustakaan Kota Yogyakarta', match: 'Perpustakaan Kota', lat: -7.7867, lng: 110.3700 },
+  ];
 
   return {
     today, T, ymd, D, addMin, sortSessions,
     roles, accounts, staff, subjects, groups, students, sessions, attendance, assignments, materials,
-    leaves, corrections, audit, announcements, tryouts, notes, activity, notifications, settings, rooms,
+    leaves, corrections, audit, announcements, tryouts, notes, activity, notifications, settings, places, rooms,
   };
 })();
