@@ -87,14 +87,14 @@ const LoginPage = {
     $('#forgot').addEventListener('click', e => {
       e.preventDefault();
       openModal({
-        title: 'Lupa kata sandi', sub: 'Kami akan mengirim tautan untuk mengatur ulang kata sandi.',
+        title: 'Lupa kata sandi', sub: 'Reset kata sandi diproses Kurikulum BAT. Notifikasi hanya tampil di dalam aplikasi.',
         body: `<label class="field"><span>Email terdaftar</span><input type="email" id="fg-email" value="${esc($('#email').value)}" placeholder="nama@bat.id"><small class="field-err"></small></label>`,
-        footer: `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="fg-send">Kirim tautan</button>`,
+        footer: `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="fg-send">Ajukan reset</button>`,
         onMount(m) {
           $('#fg-send', m).addEventListener('click', () => {
             const v = $('#fg-email', m).value.trim();
             if (!/^\S+@\S+\.\S+$/.test(v)) { const f = $('#fg-email', m).closest('.field'); f.classList.add('invalid'); f.querySelector('.field-err').textContent = 'Masukkan email yang valid.'; return; }
-            closeModal(); toast(`Tautan reset dikirim ke ${esc(v)} (demo).`);
+            closeModal(); toast(`Permintaan reset untuk ${esc(v)} dicatat (demo). Hubungi Kurikulum BAT; belum ada pengiriman keluar web.`, 'info');
           });
         },
       });
@@ -210,6 +210,7 @@ function render(keepScroll) {
   Cleanup.run();
   closeModal(true);
   if (!App.user) { $('#app').innerHTML = LoginPage.render(); LoginPage.mount(); document.title = 'Masuk · LMS BAT'; return; }
+  processLeaveExpiry();   // izin yang tidak ditindak sampai sesi selesai → kedaluwarsa (Tidak hadir)
   if (!$('.shell')) buildShell();
   const hash = location.hash.replace(/^#\/?/, '');
   const [page, ...params] = (hash || defaultRoute()).split('/');

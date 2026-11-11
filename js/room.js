@@ -24,7 +24,13 @@ const Room = {
   phase(s) { return Q.state(s).key === 'selesai' ? 'arsip' : s.date === todayStr() ? 'hari-h' : 'mendatang'; },
   /* Keterlambatan dihitung dari jam presensi DIBUKA tutor (+ toleransi); sesi lampau tanpa room memakai jam mulai */
   openTime(s) { const o = this.state(s).openedAt; return o ? o.split(' ')[1] : s.start; },
-  deadline(s) { return DB.addMin(this.openTime(s), DB.settings.lateTolerance); },
+  /* Batas Hadir = jam dibuka + toleransi (15 menit pertama), tidak melewati jam selesai sesi */
+  deadline(s) { const d = DB.addMin(this.openTime(s), DB.settings.lateTolerance); return toMin(d) > toMin(s.end) ? s.end : d; },
+  ended: s => Q.state(s).key === 'selesai',
+  /* Edit presensi: Wali Kelas (kelompok dampingan), Kurikulum, Administrator */
+  canEdit(s) { return App.isPanitia && (App.has('kurikulum') || (App.has('wali') && Q.waliGroupIds().includes(s.groupId))) && this.phase(s) !== 'mendatang'; },
+  /* Presensi tertutup otomatis di jam selesai sesi: yang belum presensi tanpa izin = Tidak hadir */
+  autoClose(s) { if (this.state(s).open && this.ended(s)) this.close(s, true); },
   statusAt(s, time) { return toMin(time) <= toMin(this.deadline(s)) ? 'hadir' : 'terlambat'; },
   leaveOk: (s, sid) => DB.leaves.some(l => l.sessionId === s.id && l.studentId === sid && l.status === 'disetujui'),
   record: (s, sid) => (DB.attendance[sid] || {})[s.id],
@@ -35,25 +41,28 @@ const Room = {
      Room yang dibuka/ditutup → dari daftar hadir langsung; sesi lampau tanpa room → rekap dummy deterministik. */
   roster(s) {
     const members = Q.studentsOf(s.groupId), rm = this.state(s);
+    // Penimpaan (edit panitia, izin ditolak/kedaluwarsa) selalu menang
+    const edit = st => { const e = (DB.attEdits[s.id] || {})[st.id]; return e ? { st, status: e.status, time: e.time, via: e.via, edited: e } : null; };
     const ov = st => { const r = this.record(s, st.id); return r ? { st, status: r.status, time: r.time, via: r.status === 'izin' ? 'Izin disetujui' : 'Lokasi GPS' } : this.leaveOk(s, st.id) ? { st, status: 'izin', via: 'Izin disetujui' } : null; };
     if (rm.open || rm.closed) return members.map(st => {
+      const e = edit(st); if (e) return e;
       const a = rm.attendees.find(x => x.id === st.id);
       if (a) return { st, status: a.status, time: a.time, via: a.via };
       if (this.leaveOk(s, st.id)) return { st, status: 'izin', via: 'Izin disetujui' };
-      return { st, status: rm.closed ? 'alpa' : null };
+      return { st, status: rm.closed ? 'alpa' : null, via: rm.closed ? 'Tidak presensi sampai jam selesai' : '' };
     });
     if (this.phase(s) === 'arsip') {
-      const r = sessionRecap(s), map = {};
+      const r = baseRecap(s), map = {};
       const order = members.slice().sort((a, b) => hashStr(s.id + a.id) - hashStr(s.id + b.id));
       let i = 0; const take = (n, k) => order.slice(i, i += n).forEach(st => { map[st.id] = k; });
       take(r.alpa, 'alpa'); take(r.izin, 'izin'); take(r.terlambat, 'terlambat');
       return members.map(st => {
-        const o = ov(st); if (o) return o;
+        const o = edit(st) || ov(st); if (o) return o;
         const k = map[st.id] || 'hadir', h = hashStr(st.id + s.id);
         return { st, status: k, time: k === 'hadir' ? DB.addMin(s.start, -(h % 9)) : k === 'terlambat' ? DB.addMin(s.start, DB.settings.lateTolerance + 2 + h % 14) : null, via: ['hadir', 'terlambat'].includes(k) ? 'Lokasi GPS' : k === 'izin' ? 'Izin disetujui' : '' };
       });
     }
-    return members.map(st => ov(st) || { st, status: null });
+    return members.map(st => edit(st) || ov(st) || { st, status: null });
   },
   tally(list) {
     const c = { hadir: 0, terlambat: 0, izin: 0, alpa: 0, belum: 0 };
@@ -65,6 +74,7 @@ const Room = {
   render(id) {
     const s = Q.session(id);
     if (!this.canAccess(s)) return `<div class="card">${emptyState('calendar', 'Room pertemuan tidak ditemukan', 'Sesi ini tidak ada atau di luar cakupanmu.', `<a class="btn btn-ghost" href="#/jadwal">Kembali ke jadwal</a>`)}</div>`;
+    this.autoClose(s);   // jam pelajaran selesai → presensi tertutup otomatis
     if (TabMemory._room !== id) { TabMemory._room = id; delete TabMemory.room; }
     // Agar tombol kembali membuka minggu & hari sesi ini di jadwal
     JadwalState.sel = s.date;
@@ -112,7 +122,8 @@ const Room = {
     return `<div class="kv">
       <div><span>Titik lokasi</span><b>${esc(pl.name)}</b></div>
       <div><span>Radius area</span><b>${DB.settings.geoRadius} meter</b></div>
-      <div><span>Toleransi terlambat</span><b>${DB.settings.lateTolerance} menit setelah presensi dibuka</b></div>
+      <div><span>Hadir bila presensi</span><b>≤ ${DB.settings.lateTolerance} menit sejak dibuka</b></div>
+      <div><span>Terlambat bila</span><b>setelahnya, sampai ${s.end} WIB (jam selesai)</b></div>
     </div>`;
   },
   presensiPanitia(s, manage, roster) {
@@ -122,17 +133,17 @@ const Room = {
         <div class="card-head"><h3><span class="live-dot"></span> Presensi dibuka</h3>${badge('Berbasis lokasi', 'primary', 'no-dot')}</div>
         <div class="geo-stage">
           <div class="geo-ring"><span>${icon('locate', 34)}</span></div>
-          <div class="kv-inline"><div><span>Dibuka</span><b>${this.openTime(s)} WIB</b></div><div><span>Batas tepat waktu</span><b>${this.deadline(s)} WIB</b></div></div>
+          <div class="kv-inline"><div><span>Dibuka</span><b>${this.openTime(s)} WIB</b></div><div><span>Batas Hadir</span><b>${this.deadline(s)} WIB</b></div><div><span>Presensi sampai</span><b>${s.end} WIB</b></div></div>
         </div>
         ${this.geoInfo(s)}
-        <p class="muted small" style="margin:12px 0">Pelajar menekan tombol <b>Presensi dengan lokasi</b> di room ini dan harus berada di dalam radius area. Lewat dari batas tepat waktu tercatat <b>Terlambat</b>. Pelajar dengan izin yang sudah disetujui otomatis tercatat <b>Izin</b>.</p>
+        <p class="muted small" style="margin:12px 0">Pelajar menekan tombol <b>Presensi dengan lokasi</b> di room ini dan harus berada di dalam radius area. Presensi bisa dilakukan sepanjang jam pelajaran (sampai ${s.end} WIB): sebelum batas Hadir = <b>Hadir</b>, sesudahnya = <b>Terlambat</b>, tidak presensi sampai jam selesai = <b>Tidak hadir</b> (presensi tertutup otomatis). Pelajar dengan izin yang disetujui otomatis tercatat <b>Izin</b>.</p>
         ${manage ? `<button class="btn btn-danger btn-block" data-r="close">${icon('xCircle', 16)} Tutup presensi</button>` : `<div class="note info" style="margin:0">${icon('eye', 15)}<span>Kamu memantau. Presensi dikelola tutor sesi atau Kurikulum.</span></div>`}
       </div>
       <div class="card" id="rm-live">${this.liveList(s, manage)}</div>
-    </div>`;
+    </div>${this.canEdit(s) ? `<div style="margin-top:16px">${this.recapTable(s, roster)}</div>` : ''}`;
     let head = '';
     if (phase === 'hari-h' && !rm.closed) head = manage
-      ? `<div class="card" style="margin-bottom:16px"><div class="row-between wrap" style="gap:12px"><div><b>Presensi belum dibuka</b><p class="muted small" style="margin-top:4px">Pelajar baru dapat presensi setelah kamu membukanya. Batas tepat waktu = jam dibuka + ${DB.settings.lateTolerance} menit. Titik lokasi: ${esc(placeOf(s).name)} (radius ${DB.settings.geoRadius} m).</p></div><button class="btn btn-primary" data-r="open">${icon('locate', 16)} Buka presensi</button></div></div>`
+      ? `<div class="card" style="margin-bottom:16px"><div class="row-between wrap" style="gap:12px"><div><b>Presensi belum dibuka</b><p class="muted small" style="margin-top:4px">Pelajar baru dapat presensi setelah kamu membukanya. Presensi berlaku sampai jam selesai (${s.end} WIB): ≤ ${DB.settings.lateTolerance} menit sejak dibuka = Hadir, sesudahnya = Terlambat, tidak presensi = Tidak hadir. Titik lokasi: ${esc(placeOf(s).name)} (radius ${DB.settings.geoRadius} m).</p></div><button class="btn btn-primary" data-r="open">${icon('locate', 16)} Buka presensi</button></div></div>`
       : `<div class="note info" style="margin:0 0 16px">${icon('clock', 15)}<span>Presensi belum dibuka oleh tutor sesi.</span></div>`;
     if (phase === 'mendatang') head = `<div class="note info" style="margin:0 0 16px">${icon('calendar', 15)}<span>Presensi dapat dibuka tutor pada hari H (${fmtDay(s.date)}, ${s.start} WIB).</span></div>`;
     if (rm.closed) head = `<div class="note success" style="margin:0 0 16px">${icon('checkCircle', 15)}<span>Presensi dibuka ${this.openTime(s)} dan ditutup ${rm.closedAt ? rm.closedAt.split(' ')[1] : ''} WIB. Pelajar tanpa presensi & tanpa izin tercatat <b>Tidak hadir</b>.</span></div>`;
@@ -152,14 +163,15 @@ const Room = {
   },
   personRow: r => `<div class="item">${avatar(r.st.name, 'sm')}<div class="item-body"><div class="item-title">${esc(r.st.name)}</div><div class="item-sub">${r.time ? r.time + ' WIB' : '—'}${r.via ? ' · ' + esc(r.via) : ''}</div></div>${r.status ? badge(ATT[r.status].label, ATT[r.status].tone) : badge('Belum', 'neutral')}</div>`,
   recapTable(s, roster) {
-    const t = this.tally(roster);
+    const t = this.tally(roster), canEdit = this.canEdit(s);
     return `<div class="card">
       <div class="card-head"><h3>Rekap kehadiran pertemuan</h3><span class="muted small">${t.present} dari ${t.total} pelajar hadir · skor ${t.score}</span></div>
       <div class="row wrap" style="gap:8px;margin-bottom:12px">${badge(`${t.hadir} hadir`, 'success')}${badge(`${t.terlambat} terlambat`, 'warning')}${badge(`${t.izin} izin`, 'info')}${badge(`${t.alpa} tidak hadir`, 'danger')}${t.belum ? badge(`${t.belum} belum`, 'neutral') : ''}</div>
-      <div class="table-wrap"><table><thead><tr><th>Pelajar</th><th>Status</th><th>Waktu</th><th>Keterangan</th><th>Poin</th></tr></thead><tbody>
-        ${roster.map(r => `<tr><td><div class="cell-user">${avatar(r.st.name, 'sm')}<div><b>${esc(r.st.name)}</b></div></div></td><td>${r.status ? badge(ATT[r.status].label, ATT[r.status].tone) : badge('Belum', 'neutral')}</td><td>${r.time ? r.time + ' WIB' : '—'}</td><td class="muted small">${esc(r.via || '—')}</td><td><b>${r.status ? fmtPoint(r.status) : '—'}</b></td></tr>`).join('') || `<tr><td colspan="5">${emptyState('users', 'Belum ada anggota')}</td></tr>`}
+      ${canEdit ? `<div class="note primary" style="margin:0 0 12px">${icon('edit', 15)}<span>Kamu dapat mengedit status presensi pelajar. Setiap perubahan wajib beralasan, tercatat di audit trail, dan terlihat oleh pelajar.</span></div>` : ''}
+      <div class="table-wrap"><table><thead><tr><th>Pelajar</th><th>Status</th><th>Waktu</th><th>Keterangan</th><th>Poin</th>${canEdit ? '<th></th>' : ''}</tr></thead><tbody>
+        ${roster.map(r => `<tr><td><div class="cell-user">${avatar(r.st.name, 'sm')}<div><b>${esc(r.st.name)}</b></div></div></td><td>${r.status ? badge(ATT[r.status].label, ATT[r.status].tone) : badge('Belum', 'neutral')}</td><td>${r.time ? r.time + ' WIB' : '—'}</td><td class="muted small">${esc(r.via || '—')}${r.edited ? `<div>Alasan: ${esc(r.edited.note)}</div>` : ''}</td><td><b>${r.status ? fmtPoint(r.status) : '—'}</b></td>${canEdit ? `<td style="text-align:right"><button class="btn btn-sm btn-ghost" data-edit-att="${r.st.id}" aria-label="Edit presensi ${esc(r.st.name)}">${icon('edit', 14)} Edit</button></td>` : ''}</tr>`).join('') || `<tr><td colspan="${canEdit ? 6 : 5}">${emptyState('users', 'Belum ada anggota')}</td></tr>`}
       </tbody></table></div>
-      <p class="muted small" style="margin-top:10px">Poin presensi: Hadir 1 · Terlambat 0,5 · Tidak hadir 0 · Izin tidak dihitung.</p>
+      <p class="muted small" style="margin-top:10px">Poin presensi (hanya untuk panitia): Hadir 1 · Terlambat 0,5 · Tidak hadir 0 · Izin tidak dihitung.</p>
     </div>`;
   },
 
@@ -167,26 +179,27 @@ const Room = {
   presensiPelajar(s, mine, t) {
     const rm = this.state(s), phase = this.phase(s);
     let main;
-    if (mine && mine.status && (mine.status !== 'alpa' || phase === 'arsip' || rm.closed)) {
+    if (mine && mine.status && (mine.edited || mine.status !== 'alpa' || phase === 'arsip' || rm.closed || this.ended(s))) {
       const m = ATT[mine.status];
       main = `<div class="scan-success"><div class="success-ic t-${m.tone}">${icon(mine.status === 'alpa' ? 'xCircle' : mine.status === 'izin' ? 'clipboard' : 'check', 36)}</div>
         <h3>${mine.status === 'izin' ? 'Izin disetujui' : mine.status === 'alpa' ? 'Tidak hadir' : 'Presensi tercatat!'}</h3>
         ${mine.status === 'izin' ? '<p class="muted">Pengajuan izinmu untuk pertemuan ini sudah disetujui, jadi kehadiranmu otomatis tercatat Izin.</p>' : ''}
-        <div class="kv-inline"><div><span>Waktu</span><b>${mine.time ? mine.time + ' WIB' : '—'}</b></div><div><span>Status</span>${badge(m.label, m.tone)}</div><div><span>Poin</span><b>${fmtPoint(mine.status)}</b></div></div>
+        <div class="kv-inline"><div><span>Waktu</span><b>${mine.time ? mine.time + ' WIB' : '—'}</b></div><div><span>Status</span>${badge(m.label, m.tone)}</div></div>
         ${mine.via && mine.status !== 'izin' ? `<p class="muted small">${esc(mine.via)}</p>` : ''}
+        ${mine.edited ? `<p class="muted small">Alasan: ${esc(mine.edited.note)}</p>` : ''}
         ${['alpa', 'terlambat'].includes(mine.status) ? `<p class="muted small">Ada kesalahan pencatatan? <button class="link" style="color:var(--primary);font-weight:700" data-correct="${s.id}">Ajukan koreksi</button></p>` : ''}</div>`;
     } else if (rm.open) {
       const pl = placeOf(s);
       main = `<div class="geo-stage">
         <div class="geo-ring"><span>${icon('locate', 34)}</span></div>
         <h3 style="font-size:19px;font-weight:800">Presensi sedang dibuka</h3>
-        <p class="muted" style="text-align:center">Pastikan kamu berada di <b>${esc(pl.name)}</b> (radius ${DB.settings.geoRadius} m), lalu tekan tombol di bawah. Batas tepat waktu pukul <b>${this.deadline(s)}</b> WIB.</p>
+        <p class="muted" style="text-align:center">Pastikan kamu berada di <b>${esc(pl.name)}</b> (radius ${DB.settings.geoRadius} m), lalu tekan tombol di bawah. Presensi dibuka sampai <b>${s.end}</b> WIB: sebelum <b>${this.deadline(s)}</b> tercatat <b>Hadir</b>, sesudahnya <b>Terlambat</b>. Tidak presensi sampai jam selesai = Tidak hadir.</p>
         <button class="btn btn-primary btn-lg" data-r="geo">${icon('locate', 18)} Presensi dengan lokasi saya</button>
         <div id="geo-msg" aria-live="polite"></div>
         <div class="demo-geo"><span class="muted small">Demo tanpa GPS:</span><button class="btn btn-sm btn-ghost" data-r="sim-in">Simulasi di lokasi</button><button class="btn btn-sm btn-ghost" data-r="sim-out">Simulasi di luar area</button></div>
       </div>`;
     } else if (phase === 'hari-h') {
-      main = emptyState('clock', 'Menunggu tutor membuka presensi', `Tombol presensi lokasi akan muncul setelah ${esc(s.tutor)} membuka presensi.`);
+      main = emptyState('clock', 'Menunggu tutor membuka presensi', `Tombol presensi lokasi akan muncul setelah ${esc(s.tutor)} membuka presensi. Setelah dibuka, kamu bisa presensi sampai ${s.end} WIB.`);
     } else {
       main = emptyState('calendar', 'Presensi dibuka di hari H', `${fmtDay(s.date)}, ${s.start} WIB, setelah tutor membuka presensi. Tidak bisa hadir?`, `<a class="btn btn-sm btn-ghost" href="#/izin">Ajukan izin</a>`);
     }
@@ -199,8 +212,7 @@ const Room = {
           <div><span>${badge('Izin', 'info')}</span><b>${t.izin}</b></div>
           <div><span>${badge('Tidak hadir', 'danger')}</span><b>${t.alpa}</b></div>
           ${t.belum ? `<div><span>${badge('Belum presensi', 'neutral')}</span><b>${t.belum}</b></div>` : ''}
-        </div>
-        <p class="muted small" style="margin-top:10px">Poin: Hadir 1 · Terlambat 0,5 · Tidak hadir 0.</p></div>
+        </div></div>
     </div>`;
   },
 
@@ -271,6 +283,7 @@ const Room = {
       if (dn) { const a = DB.assignments.find(x => x.id === dn.dataset.do); return a.kind === 'kuis' ? this.quizModal(a) : PelajarPages.tugas.submitModal(a.id); }
       const se = t.closest('[data-see]');
       if (se) { const a = DB.assignments.find(x => x.id === se.dataset.see); return a.kind === 'kuis' ? this.quizResult(a) : PelajarPages.tugas.viewModal(a.id); }
+      const ea = t.closest('[data-edit-att]'); if (ea && this.canEdit(s)) return this.editModal(s, ea.dataset.editAtt);
       const mn = t.closest('[data-manual]');
       if (mn && manage) {
         const st = Q.student(mn.dataset.manual), time = nowHM();
@@ -286,7 +299,7 @@ const Room = {
         Object.assign(rm, { open: true, closed: false, openedAt: stamp() });
         DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Membuka presensi ${this.label(s)}` });
         TabMemory.room = 'presensi';
-        toast(`Presensi dibuka. Batas tepat waktu ${this.deadline(s)} WIB.`); return App.refresh();
+        toast(`Presensi dibuka sampai ${s.end} WIB. Hadir bila presensi sebelum ${this.deadline(s)} WIB, sesudahnya Terlambat.`); return App.refresh();
       }
       if (act === 'close' && manage) return this.close(s);
       if (act === 'geo') return this.geoCheckIn(root, r, s);
@@ -298,6 +311,30 @@ const Room = {
       if (act === 'upload') return this.upload(root, s, upFile);
       if (act === 'task') return this.taskModal(s);
       if (act === 'quiz') return this.quizBuilder(s);
+    });
+  },
+  /* Edit presensi (Wali Kelas dampingan, Kurikulum, Administrator): alasan wajib, tercatat di audit */
+  editModal(s, studentId) {
+    const st = Q.student(studentId), cur = this.roster(s).find(r => r.st.id === studentId);
+    openModal({
+      title: 'Edit presensi', sub: `${esc(st.name)} · ${esc(this.label(s))}`,
+      body: `<div class="kv"><div><span>Status saat ini</span><b>${cur.status ? badge(ATT[cur.status].label, ATT[cur.status].tone) : badge('Belum', 'neutral')}</b></div></div>
+        <label class="field"><span>Status baru</span><select id="ea-status">${['hadir', 'terlambat', 'izin', 'alpa'].map(k => `<option value="${k}" ${cur.status === k ? 'selected' : ''}>${ATT[k].label}</option>`).join('')}</select></label>
+        <label class="field"><span>Alasan perubahan (wajib)</span><textarea id="ea-note" placeholder="cth. Pelajar hadir tetapi GPS bermasalah, dikonfirmasi tutor…" style="min-height:80px"></textarea><small class="field-err"></small></label>
+        <div class="note primary">${icon('shield', 15)}<span>Perubahan tercatat di audit trail (siapa, kapan, alasan) dan terlihat oleh pelajar.</span></div>`,
+      footer: `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="ea-save">${icon('check', 16)} Simpan perubahan</button>`,
+      onMount: m => {
+        $('#ea-save', m).addEventListener('click', () => {
+          const status = $('#ea-status', m).value, note = $('#ea-note', m).value.trim();
+          fieldErr($('#ea-note', m), note.length >= 5 ? '' : 'Alasan wajib diisi (minimal 5 karakter).');
+          if (note.length < 5) return;
+          if (cur.status === status) return toast('Status baru sama dengan status saat ini.', 'error');
+          setAttOverride(s.id, studentId, status, App.user.name, note);
+          DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Mengubah presensi ${st.name} (${this.label(s)}): ${cur.status ? ATT[cur.status].label : 'Belum'} → ${ATT[status].label}. Alasan: ${note}` });
+          if (st.id === 'p1') DB.notifications.pelajar.unshift({ title: 'Presensi diperbarui', text: `${s.topic}: status presensimu kini ${ATT[status].label}.`, at: stamp(), unread: true, icon: 'qr' });
+          closeModal(); toast(`Presensi ${esc(st.name)} diubah menjadi ${ATT[status].label}.`); App.refresh();
+        });
+      },
     });
   },
   label(s) { return `${Q.grp(s.groupId).name} · ${Q.subj(s.subjectId).code} (${s.topic})`; },
@@ -325,16 +362,21 @@ const Room = {
       simT = setTimeout(sim, 1800 + Math.random() * 2600);
     };
     simT = setTimeout(sim, 1500);
-    Cleanup.add(() => clearTimeout(simT));
+    // Jam pelajaran selesai → presensi tertutup otomatis
+    const endT = setInterval(() => {
+      if (!this.ended(s)) return;
+      clearInterval(endT); this.autoClose(s);
+      toast('Jam pelajaran selesai. Presensi ditutup otomatis; yang belum presensi tercatat Tidak hadir.', 'info'); App.refresh();
+    }, 5000);
+    Cleanup.add(() => { clearTimeout(simT); clearInterval(endT); });
   },
-  close(s) {
+  close(s, auto) {
     const rm = this.state(s);
-    Object.assign(rm, { open: false, closed: true, closedAt: stamp() });
+    Object.assign(rm, { open: false, closed: true, closedAt: auto ? `${s.date} ${s.end}` : stamp() });
     const roster = this.roster(s), t = this.tally(roster);
     roster.forEach(r => { if (r.status === 'alpa' && DB.attendance[r.st.id]) DB.attendance[r.st.id][s.id] = { status: 'alpa', time: null }; });
-    // Rekap sesi mengikuti hasil presensi nyata (dipakai dashboard & laporan)
-    _recap[s.id] = { hadir: t.hadir, terlambat: t.terlambat, izin: t.izin, alpa: t.alpa, total: t.total, pct: t.total ? Math.round(t.present / t.total * 100) : 0 };
-    DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Menutup presensi ${this.label(s)} (${t.present}/${t.total} hadir)` });
+    DB.audit.unshift({ who: auto ? 'Sistem' : App.user.name, at: stamp(), what: `${auto ? 'Presensi tertutup otomatis di jam selesai' : 'Menutup presensi'} ${this.label(s)} (${t.present}/${t.total} hadir)` });
+    if (auto) return;
     DB.activity.unshift({ who: App.user.name, what: 'menutup presensi', obj: `${Q.grp(s.groupId).name} · ${Q.subj(s.subjectId).code}`, at: stamp(), icon: 'locate' });
     toast(`Presensi ditutup. ${t.alpa} pelajar tanpa presensi & izin tercatat “Tidak hadir”.`, 'info');
     App.refresh();
@@ -353,6 +395,9 @@ const Room = {
   checkIn(root, btn, s, pos, simulated) {
     const me = Q.me(), rm = this.state(s), pl = placeOf(s);
     if (!rm.open) return toast('Presensi belum dibuka.', 'error');
+    if (this.ended(s)) { this.autoClose(s); toast('Jam pelajaran sudah selesai; presensi ditutup.', 'error'); return App.refresh(); }
+    const ov = (DB.attEdits[s.id] || {})[me.id];
+    if (ov || this.leaveOk(s, me.id)) { btn.classList.remove('loading'); return toast(this.leaveOk(s, me.id) && !ov ? 'Izinmu sudah disetujui; tidak perlu presensi.' : 'Kehadiranmu sudah diatur (izin ditolak / diedit panitia). Hubungi Wali Kelas atau Kurikulum bila ada kesalahan.', 'error'); }
     const dist = distanceM(pos, pl);
     btn.classList.remove('loading');
     if (dist > DB.settings.geoRadius) {

@@ -112,7 +112,8 @@ const LEAVE = {
   wali: { label: 'Menunggu verifikasi Wali Kelas', short: 'Menunggu Wali Kelas', tone: 'warning' },
   kurikulum: { label: 'Menunggu persetujuan Kurikulum', short: 'Menunggu Kurikulum', tone: 'info' },
   disetujui: { label: 'Disetujui', short: 'Disetujui', tone: 'success' },
-  ditolak: { label: 'Ditolak', short: 'Ditolak', tone: 'danger' },
+  ditolak: { label: 'Ditolak · tidak hadir', short: 'Ditolak', tone: 'danger' },
+  kedaluwarsa: { label: 'Tidak ditindak sampai sesi selesai · tidak hadir', short: 'Kedaluwarsa', tone: 'neutral' },
 };
 const TASK = {
   belum: { label: 'Belum dikumpul', tone: 'warning' },
@@ -238,7 +239,8 @@ function distanceM(a, b) {
 
 /* Rekap presensi per sesi (dummy deterministik) */
 const _recap = {};
-function sessionRecap(s) {
+/* Rekap dasar (dummy deterministik) untuk sesi lampau yang belum punya data presensi riil */
+function baseRecap(s) {
   if (_recap[s.id]) return _recap[s.id];
   const n = Q.studentsOf(s.groupId).length;
   let h = hashStr(s.id + 'r');
@@ -246,6 +248,42 @@ function sessionRecap(s) {
   const alpa = Math.floor(r() * 1.6), izin = Math.floor(r() * 2.2), terlambat = Math.floor(r() * 3);
   const hadir = Math.max(0, n - alpa - izin - terlambat);
   return (_recap[s.id] = { hadir, terlambat, izin, alpa, total: n, pct: n ? Math.round((hadir + terlambat) / n * 100) : 0 });
+}
+
+/* Rekap presensi per sesi: memakai data presensi riil (room dibuka/ditutup atau ada edit), selain itu rekap dasar */
+function sessionRecap(s) {
+  const rm = DB.rooms[s.id];
+  if (typeof Room !== 'undefined' && (DB.attEdits[s.id] || (rm && (rm.open || rm.closed)))) {
+    const t = Room.tally(Room.roster(s));
+    return { hadir: t.hadir, terlambat: t.terlambat, izin: t.izin, alpa: t.alpa, total: t.total, pct: t.total ? Math.round(t.present / t.total * 100) : 0 };
+  }
+  return baseRecap(s);
+}
+
+/* ---------- Penimpaan presensi: edit panitia, izin ditolak, izin kedaluwarsa ---------- */
+function setAttOverride(sessionId, studentId, status, by, note, via) {
+  const s = Q.session(sessionId);
+  const old = (DB.attEdits[sessionId] || {})[studentId];
+  const rec = (DB.attendance[studentId] || {})[sessionId];
+  const time = ['hadir', 'terlambat'].includes(status) ? ((old && old.time) || (rec && rec.time) || s.start) : null;
+  (DB.attEdits[sessionId] = DB.attEdits[sessionId] || {})[studentId] = { status, time, by, note, via: via || `Diedit oleh ${by}`, at: stamp() };
+  if (DB.attendance[studentId]) DB.attendance[studentId][sessionId] = { status, time };
+}
+
+/* ---------- Perizinan: arsip & kedaluwarsa ---------- */
+/* Pengajuan untuk sesi yang sudah lewat tidak lagi aktif (diarsipkan) */
+const leaveEnded = l => { const s = Q.session(l.sessionId); return !s || Q.state(s).key === 'selesai'; };
+/* Pengajuan yang belum ditindak sampai jam pelajaran selesai → kedaluwarsa, pelajar dianggap Tidak hadir */
+function processLeaveExpiry() {
+  DB.leaves.forEach(l => {
+    if (!['wali', 'kurikulum'].includes(l.status) || !leaveEnded(l)) return;
+    const st = Q.student(l.studentId);
+    l.status = 'kedaluwarsa'; l.expiredAt = stamp();
+    if (!st) return;
+    setAttOverride(l.sessionId, l.studentId, 'alpa', 'Sistem', 'Izin tidak ditindak sampai jam pelajaran selesai', 'Izin tidak ditindak → tidak hadir');
+    DB.audit.unshift({ who: 'Sistem', at: stamp(), what: `Izin ${st.name} kedaluwarsa (tidak ditindak sampai sesi selesai) → Tidak hadir` });
+    if (st.id === 'p1') DB.notifications.pelajar.unshift({ title: 'Izin kedaluwarsa', text: 'Pengajuan izinmu tidak ditindak sampai sesi selesai, sehingga tercatat Tidak hadir.', at: stamp(), unread: true, icon: 'clipboard' });
+  });
 }
 
 /* Kehadiran agregat sekumpulan sesi:
@@ -404,18 +442,27 @@ function barChart(data, { max, suffix = '' } = {}) {
 
 /* ---------- Lini masa izin ---------- */
 function leaveTimeline(l) {
-  const st = Q.student(l.studentId);
-  const s = Q.session(l.sessionId);
+  const st = Q.student(l.studentId), s = Q.session(l.sessionId);
   const wali = s ? Q.grp(s.groupId).wali : '-';
-  const items = [{ cls: 'done', title: 'Pengajuan dikirim', meta: `${st.name} · ${fmtStamp(l.createdAt)}` }];
+  const items = [{ cls: 'done', title: 'Pengajuan dikirim', meta: `${st.name} · ${fmtStamp(l.createdAt)}${l.file ? ' · lampiran: ' + esc(l.file) : ''}` }];
+  const alpa = meta => ({ cls: 'rejected', title: 'Status presensi: Tidak hadir', meta });
   if (l.status === 'wali') {
-    items.push({ cls: 'current', title: 'Verifikasi awal Wali Kelas', meta: `Menunggu ${wali}` });
-    items.push({ cls: '', title: 'Keputusan Kurikulum', meta: 'Belum diproses' });
+    items.push({ cls: 'current', title: 'Keputusan Wali Kelas (terima / tolak)', meta: `Menunggu ${wali}` });
+    items.push({ cls: '', title: 'Keputusan Kurikulum', meta: 'Hanya bila diterima Wali Kelas' });
+  } else if (l.status === 'kedaluwarsa' && !l.waliBy) {
+    items.push({ cls: 'rejected', title: 'Tidak ditindak Wali Kelas', meta: `Sesi selesai tanpa keputusan · ${fmtStamp(l.expiredAt)}` });
+    items.push(alpa('Otomatis'));
   } else {
-    items.push({ cls: 'done', title: `Diverifikasi Wali Kelas${l.waliRec ? ` · ${l.waliRec}` : ''}`, meta: `${l.waliBy} · ${fmtStamp(l.waliAt)}`, note: l.waliNote });
-    if (l.status === 'kurikulum') items.push({ cls: 'current', title: 'Keputusan Kurikulum', meta: 'Sedang ditinjau' });
-    else items.push({ cls: l.status === 'disetujui' ? 'done' : 'rejected', title: l.status === 'disetujui' ? 'Disetujui Kurikulum' : 'Ditolak Kurikulum', meta: `${l.decisionBy} · ${fmtStamp(l.decisionAt)}`, note: l.decisionNote });
-    if (l.status === 'disetujui') items.push({ cls: 'done', title: 'Status presensi diperbarui', meta: 'Otomatis menjadi “Izin”' });
+    const waliNo = l.waliDecision === 'ditolak';
+    items.push({ cls: waliNo ? 'rejected' : 'done', title: waliNo ? 'Ditolak Wali Kelas' : 'Diterima Wali Kelas', meta: `${l.waliBy} · ${fmtStamp(l.waliAt)}`, note: l.waliNote });
+    if (waliNo) items.push(alpa('Otomatis (izin ditolak Wali Kelas)'));
+    else if (l.status === 'kurikulum') items.push({ cls: 'current', title: 'Keputusan Kurikulum', meta: 'Sedang ditinjau' });
+    else if (l.status === 'kedaluwarsa') { items.push({ cls: 'rejected', title: 'Tidak diputuskan Kurikulum', meta: `Sesi selesai tanpa keputusan · ${fmtStamp(l.expiredAt)}` }); items.push(alpa('Otomatis')); }
+    else {
+      const ok = l.status === 'disetujui';
+      items.push({ cls: ok ? 'done' : 'rejected', title: ok ? 'Disetujui Kurikulum' : 'Ditolak Kurikulum', meta: `${l.decisionBy} · ${fmtStamp(l.decisionAt)}`, note: l.decisionNote });
+      items.push(ok ? { cls: 'done', title: 'Status presensi diperbarui', meta: 'Otomatis menjadi “Izin”' } : alpa('Otomatis (izin ditolak Kurikulum)'));
+    }
   }
   return `<div class="timeline">${items.map(i => `<div class="tl ${i.cls}"><b>${i.title}</b><span>${i.meta}</span>${i.note ? `<p class="tl-note">“${esc(i.note)}”</p>` : ''}</div>`).join('')}</div>`;
 }
@@ -478,7 +525,7 @@ function openCorrection(sessionId) {
 const Shared = {};
 
 /* ---------- Detail Kelompok Kelas (tab Informasi · Anggota · Jadwal · Presensi) ---------- */
-Shared.groupDetail = (id, isPanitia) => {
+Shared.groupDetail = (id, isPanitia, opts = {}) => {
   const g = Q.grp(id);
   if (!g) return `<div class="card">${emptyState('layers', 'Kelompok Kelas tidak ditemukan', '', `<a class="btn btn-ghost" href="#/kelas">Kembali</a>`)}</div>`;
   const members = Q.studentsOf(g.id);
@@ -499,7 +546,7 @@ Shared.groupDetail = (id, isPanitia) => {
 
   return `
   <div class="class-hero" style="--c:${g.color}">
-    ${isPanitia ? `<a class="back" href="#/kelas">${icon('left', 16)} Semua Kelompok Kelas</a>` : `<span class="back">${icon('layers', 16)} Kelompok Kelas-mu</span>`}
+    ${isPanitia && opts.solo ? `<span class="back">${icon('layers', 16)} Kelompok Kelas dampinganmu</span>` : isPanitia ? `<a class="back" href="#/kelas">${icon('left', 16)} Semua Kelompok Kelas</a>` : `<span class="back">${icon('layers', 16)} Kelompok Kelas-mu</span>`}
     <h1>${esc(g.name)}</h1>
     <p>Wali Kelas <b>${esc(g.wali)}</b> · ${members.length} pelajar · ${subs.length} mata pelajaran</p>
     <div class="hero-actions">
@@ -514,7 +561,6 @@ Shared.groupDetail = (id, isPanitia) => {
       <button class="tab ${tabCls('grp', 'info', true)}" data-tab="info">${icon('book', 16)} Informasi</button>
       <button class="tab ${tabCls('grp', 'anggota')}" data-tab="anggota">${icon('users', 16)} Anggota <span class="muted">${members.length}</span></button>
       <button class="tab ${tabCls('grp', 'jadwal')}" data-tab="jadwal">${icon('calendar', 16)} Jadwal</button>
-      ${!isPanitia ? `<button class="tab ${tabCls('grp', 'presensi')}" data-tab="presensi">${icon('qr', 16)} Presensi</button>` : ''}
     </div>
 
     <div class="tab-pane ${tabCls('grp', 'info', true)}" data-pane="info">
@@ -571,12 +617,6 @@ Shared.groupDetail = (id, isPanitia) => {
       </div>
     </div>
 
-    ${!isPanitia ? `<div class="tab-pane ${tabCls('grp', 'presensi')}" data-pane="presensi">
-      <div class="card">
-        <div class="card-head"><h3>Kehadiranku di kelompok ini</h3>${badge('Tampilan saja', 'neutral', 'no-dot')}</div>
-        <div class="list">${past.filter(s => s.date <= todayStr()).slice(0, 12).map(s => { const r = rec[s.id]; const m = r ? ATT[r.status] : null; return `<div class="item"><div class="item-ic" style="--c:${m ? m.color : 'var(--muted)'}">${icon(r && r.status === 'alpa' ? 'xCircle' : 'checkCircle', 18)}</div><div class="item-body"><div class="item-title">${esc(s.topic)}</div><div class="item-sub">${esc(Q.subj(s.subjectId).code)} · ${fmtDay(s.date)}${r && r.time ? ` · presensi ${r.time}` : ''}</div></div>${m ? badge(m.label, m.tone) : badge('—')}</div>`; }).join('') || emptyState('qr', 'Belum ada data presensi')}</div>
-      </div>
-    </div>` : ''}
   </div>`;
 };
 
@@ -599,17 +639,18 @@ Shared.bindGroupActions = root => {
 const GROUP_COLORS = ['#8b7bff', '#22d3ee', '#ffb547', '#f472b6', '#34d399', '#60a5fa', '#a3e635', '#fb923c'];
 Shared.groupForm = id => {
   const g = id ? Q.grp(id) : null;
-  const walis = Q.walis();
+  // 1 Wali Kelas = 1 Kelompok Kelas: hanya wali yang belum mendampingi kelompok lain yang bisa dipilih
+  const walis = Q.walis().filter(w => !DB.groups.some(x => x !== g && x.wali === w.name));
   const load = name => DB.groups.filter(x => x.wali === name).length;
   openModal({
     title: g ? 'Ubah Kelompok Kelas' : 'Tambah Kelompok Kelas',
     sub: 'Setiap Kelompok Kelas memiliki tepat satu Wali Kelas.',
     body: `<div class="form-grid">
       <label class="field"><span>Nama Kelompok Kelas</span><input id="gf-name" value="${g ? esc(g.name) : ''}" placeholder="cth. Saintek C"><small class="field-err"></small></label>
-      <label class="field"><span>Wali Kelas</span><select id="gf-wali">${walis.map(w => `<option value="${esc(w.name)}" ${g && g.wali === w.name ? 'selected' : ''}>${esc(w.name)} · ${load(w.name)} kelompok</option>`).join('')}</select></label>
+      <label class="field"><span>Wali Kelas</span><select id="gf-wali">${walis.map(w => `<option value="${esc(w.name)}" ${g && g.wali === w.name ? 'selected' : ''}>${esc(w.name)}</option>`).join('')}</select></label>
       <label class="field"><span>Deskripsi singkat</span><textarea id="gf-desc" maxlength="200" placeholder="Fokus dan sasaran kelompok…">${g ? esc(g.desc) : ''}</textarea></label>
     </div>
-    <div class="note info">${icon('shield', 15)}<span>Pilihan Wali Kelas hanya berisi panitia berperan Wali Kelas. Tutor tidak dapat merangkap Wali Kelas. Satu Wali Kelas boleh memegang beberapa kelompok.</span></div>`,
+    <div class="note info">${icon('shield', 15)}<span>Pilihan Wali Kelas hanya berisi panitia berperan Wali Kelas. Tutor tidak dapat merangkap Wali Kelas. Satu Wali Kelas hanya mendampingi satu kelompok, sehingga hanya wali yang belum memegang kelompok yang tampil.</span></div>`,
     footer: `<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="gf-save">${icon('check', 16)} ${g ? 'Simpan perubahan' : 'Simpan kelompok'}</button>`,
     onMount(m) {
       $('#gf-save', m).addEventListener('click', () => {
@@ -617,6 +658,7 @@ Shared.groupForm = id => {
         const dup = DB.groups.some(x => x !== g && x.name.toLowerCase() === name.toLowerCase());
         fieldErr($('#gf-name', m), !name ? 'Nama kelompok wajib diisi.' : dup ? 'Nama kelompok sudah dipakai.' : '');
         if (!name || dup) return;
+        if (!$('#gf-wali', m).value) return toast('Belum ada Wali Kelas yang tersedia. Tambahkan akun Wali Kelas di Pengguna & Peran.', 'error');
         const data = { name, wali: $('#gf-wali', m).value, desc: $('#gf-desc', m).value.trim() || 'Belum ada deskripsi.' };
         if (g) {
           const waliChanged = g.wali !== data.wali;

@@ -17,6 +17,8 @@ function scopeLeaves() {
   const w = Q.waliGroupIds();
   return DB.leaves.filter(l => w.includes(Q.session(l.sessionId).groupId));
 }
+/* Wali Kelas (bukan admin): satu kelompok dampingan, antarmuka Kelompok Kelas langsung ke kelompoknya */
+const isWaliOnly = () => !App.isAdmin && !!App.user && App.user.roles.includes('wali');
 const roleBadges = u => u.roles.map(r => badge(DB.roles[r], r === 'admin' ? 'danger' : r === 'ketua' ? 'accent' : 'primary', 'no-dot')).join('');
 
 /* ---------- Dashboard ---------- */
@@ -313,6 +315,12 @@ PanitiaPages.kelas = {
   crumb: () => 'Manajemen Kelas',
   render(a) {
     if (a === 'mapel') return kelasSubnav('mapel') + MapelPage.render();
+    if (isWaliOnly()) {
+      const gid = Q.waliGroupIds()[0];
+      if (!gid) return kelasSubnav('kelompok') + `<div class="card">${emptyState('layers', 'Belum mendampingi kelompok', 'Kurikulum akan menempatkanmu sebagai Wali Kelas satu Kelompok Kelas.')}</div>`;
+      if (TabMemory._grp !== gid) { TabMemory._grp = gid; delete TabMemory.grp; }
+      return kelasSubnav('kelompok') + Shared.groupDetail(gid, true, { solo: true });
+    }
     if (a) {
       if (TabMemory._grp !== a) { TabMemory._grp = a; delete TabMemory.grp; }
       return kelasSubnav('kelompok') + Shared.groupDetail(a, true);
@@ -340,7 +348,7 @@ const KelompokPage = {
     <div class="rule-strip">
       <span>${icon('users', 14)} 1 pelajar = 1 Kelompok Kelas</span>
       <span>${icon('user', 14)} 1 kelompok = 1 Wali Kelas</span>
-      <span>${icon('layers', 14)} Wali Kelas boleh memegang beberapa kelompok</span>
+      <span>${icon('layers', 14)} 1 Wali Kelas = 1 kelompok</span>
       <span>${icon('shield', 14)} Tutor tidak merangkap Wali Kelas</span>
       <span>${icon('book', 14)} Tutor pengampu diatur per Mata Pelajaran</span>
     </div>
@@ -738,10 +746,13 @@ PanitiaPages.presensi = {
     const s = Q.session(PresensiPan.sessionId);
     const corr = DB.corrections.filter(k => scope.includes(Q.session(k.sessionId)));
     const rm = s ? Room.state(s) : null;
+    // Edit presensi: Wali Kelas (kelompok dampingan), Kurikulum, Administrator
+    const editable = scope.filter(x => Room.canEdit(x)).slice().reverse().slice(0, 8);
+    const editCard = editable.length ? `<div class="card mt"><div class="card-head"><h3>${icon('edit', 16)} Edit presensi</h3><span class="muted small">Buka pertemuan › tab Presensi › tombol Edit pada baris pelajar</span></div><div class="list">${editable.map(x => sessRow(x, { showGroup: true })).join('')}</div></div>` : '';
 
     return `
     <div class="page-head">
-      <div><h1>Presensi</h1><p>Presensi dilakukan di <b>room pertemuan</b>: tutor membuka presensi, lalu pelajar menekan tombol lokasi dan harus berada di area tempat sesi. Terlambat dihitung ${DB.settings.lateTolerance} menit setelah presensi dibuka. Halaman ini merangkum sesi hari ini, koreksi presensi, dan audit trail.</p></div>
+      <div><h1>Presensi</h1><p>Presensi dilakukan di <b>room pertemuan</b>: tutor membuka presensi, lalu pelajar menekan tombol lokasi dan harus berada di area tempat sesi. Setelah dibuka, pelajar dapat presensi sepanjang jam pelajaran: ${DB.settings.lateTolerance} menit pertama = Hadir, sesudahnya = Terlambat, tidak presensi sampai jam selesai = Tidak hadir. Halaman ini merangkum sesi hari ini, koreksi presensi, dan audit trail.</p></div>
     </div>
     ${!s ? `<div class="card">${emptyState('locate', 'Tidak ada sesi', 'Belum ada sesi dalam cakupanmu.')}</div>` : `
     <div class="cols cols-1-1">
@@ -754,7 +765,7 @@ PanitiaPages.presensi = {
         <div class="kv" style="margin-bottom:16px">
           <div><span>Kelompok Kelas</span><b>${esc(Q.grp(s.groupId).name)} · ${Q.studentsOf(s.groupId).length} pelajar</b></div>
           <div><span>Status presensi</span><b>${rm.open ? `Dibuka ${Room.openTime(s)} WIB` : rm.closed ? 'Sudah ditutup' : 'Belum dibuka'}</b></div>
-          <div><span>Batas tepat waktu</span><b>${rm.open || rm.closed ? `${Room.deadline(s)} WIB` : `Jam dibuka + ${DB.settings.lateTolerance} menit`}</b></div>
+          <div><span>Batas Hadir</span><b>${rm.open || rm.closed ? `${Room.deadline(s)} WIB` : `Jam dibuka + ${DB.settings.lateTolerance} menit`}</b></div>
           <div><span>Titik lokasi</span><b>${esc(placeOf(s).name)} · radius ${DB.settings.geoRadius} m</b></div>
         </div>
         <a class="btn btn-primary btn-lg btn-block" href="#/sesi/${s.id}">${icon('arrowRight', 18)} Masuk Kelas${Q.canRunSession(s) && !rm.open && !rm.closed ? ' & buka presensi' : ''}</a>
@@ -777,7 +788,8 @@ PanitiaPages.presensi = {
         <div class="card-head"><h3>${icon('shield', 16)} Audit trail</h3><span class="muted small">Siapa · kapan · apa yang diubah</span></div>
         ${DB.audit.slice(0, 8).map(a => `<div class="activity">${avatar(a.who, 'xs')}<div><p><b>${esc(a.who)}</b> · ${esc(a.what)}</p><time>${relStamp(a.at)}</time></div></div>`).join('')}
       </div>
-    </div>`;
+    </div>
+    ${editCard}`;
   },
   /* Ringkasan daftar hadir diambil dari Room Pertemuan (sumber data presensi yang sama) */
   liveView(s) {
@@ -815,52 +827,57 @@ const IzinPan = { filter: 'aksi' };
 PanitiaPages.perizinan = {
   title: 'Perizinan',
   render() {
-    const all = scopeLeaves().slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const allL = scopeLeaves().slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    // Hanya pengajuan untuk sesi yang belum lewat yang aktif. Sesi lewat → Arsip (belum ditindak = Tidak hadir)
+    const active = allL.filter(l => !leaveEnded(l)), arsip = allL.filter(leaveEnded);
     const mine = myLeaveActions();
-    if (IzinPan.filter === 'aksi' && !App.has('wali', 'kurikulum')) IzinPan.filter = 'semua';
+    const canAct = App.has('wali', 'kurikulum');
+    if (IzinPan.filter === 'aksi' && !canAct) IzinPan.filter = 'semua';
     const filters = [
-      ...(App.has('wali', 'kurikulum') ? [['aksi', 'Perlu tindakan saya', mine.length]] : []),
-      ['semua', 'Semua', all.length],
-      ['wali', 'Menunggu Wali Kelas', all.filter(l => l.status === 'wali').length],
-      ['kurikulum', 'Menunggu Kurikulum', all.filter(l => l.status === 'kurikulum').length],
-      ['disetujui', 'Disetujui', all.filter(l => l.status === 'disetujui').length],
-      ['ditolak', 'Ditolak', all.filter(l => l.status === 'ditolak').length],
+      ...(canAct ? [['aksi', 'Perlu tindakan saya', mine.length]] : []),
+      ['semua', 'Aktif', active.length],
+      ['wali', 'Menunggu Wali Kelas', active.filter(l => l.status === 'wali').length],
+      ['kurikulum', 'Menunggu Kurikulum', active.filter(l => l.status === 'kurikulum').length],
+      ['disetujui', 'Disetujui', active.filter(l => l.status === 'disetujui').length],
+      ['ditolak', 'Ditolak', active.filter(l => l.status === 'ditolak').length],
+      ['arsip', 'Arsip', arsip.length],
     ];
-    const list = IzinPan.filter === 'aksi' ? mine : IzinPan.filter === 'semua' ? all : all.filter(l => l.status === IzinPan.filter);
-    const roleNote = App.isAdmin ? ['primary', 'Sebagai <b>Administrator</b>, kamu dapat melakukan verifikasi Wali Kelas maupun keputusan akhir Kurikulum untuk seluruh pengajuan.']
-      : App.has('kurikulum') ? ['primary', 'Sebagai <b>Kurikulum</b>, kamu memberi <b>keputusan akhir</b>. Persetujuan otomatis mengubah status presensi sesi tersebut menjadi “Izin”.']
-      : App.has('wali') ? ['primary', 'Sebagai <b>Wali Kelas</b>, kamu memberi <b>verifikasi awal</b> beserta catatan/rekomendasi sebelum diteruskan ke Kurikulum.']
+    const list = IzinPan.filter === 'aksi' ? mine : IzinPan.filter === 'semua' ? active : IzinPan.filter === 'arsip' ? arsip : active.filter(l => l.status === IzinPan.filter);
+    const roleNote = App.isAdmin ? ['primary', 'Sebagai <b>Administrator</b>, kamu dapat memutuskan sebagai Wali Kelas (terima / tolak) maupun sebagai Kurikulum (keputusan akhir) untuk seluruh pengajuan.']
+      : App.has('kurikulum') ? ['primary', 'Sebagai <b>Kurikulum</b>, kamu memberi <b>keputusan akhir</b> hanya untuk izin yang sudah <b>diterima Wali Kelas</b>. Disetujui → presensi menjadi “Izin”. Ditolak, atau tidak ditindak sampai sesi selesai → <b>Tidak hadir</b>.']
+      : App.has('wali') ? ['primary', 'Sebagai <b>Wali Kelas</b>, kamu memilih <b>Terima</b> (diteruskan ke Kurikulum) atau <b>Tolak</b> (pelajar langsung Tidak hadir). Pengajuan yang tidak kamu tindak sampai jam pelajaran selesai otomatis diarsipkan sebagai Tidak hadir.']
       : ['warning', 'Sebagai <b>Ketua BAT</b>, kamu memiliki akses <b>pemantauan</b> tanpa masuk ke alur persetujuan rutin.'];
     return `
-    <div class="page-head"><div><h1>Perizinan</h1><p>Satu pengajuan untuk satu sesi, lampiran opsional. Alur: Pelajar → Wali Kelas (verifikasi awal) → Kurikulum (keputusan akhir) → status presensi diperbarui.</p></div></div>
+    <div class="page-head"><div><h1>Perizinan</h1><p>Satu pengajuan untuk satu sesi, lampiran bukti wajib. Alur: Pelajar → Wali Kelas (terima / tolak) → Kurikulum (keputusan akhir). Daftar hanya menampilkan pengajuan untuk sesi yang belum lewat; setelah sesi selesai pengajuan masuk <b>Arsip</b>.</p></div></div>
     <div class="alert alert-${roleNote[0]}" style="margin-bottom:16px">${icon('shield', 16)}<span>${roleNote[1]}</span></div>
     ${Q.seeAll() ? `<div class="stats" style="margin-bottom:16px">
-      ${statCard('clipboard', all.length, 'Total pengajuan', 'primary')}
-      ${statCard('clock', all.filter(l => ['wali', 'kurikulum'].includes(l.status)).length, 'Dalam proses', 'warning')}
-      ${statCard('checkCircle', all.filter(l => l.status === 'disetujui').length, 'Disetujui', 'success')}
-      ${statCard('xCircle', all.filter(l => l.status === 'ditolak').length, 'Ditolak', 'danger')}
+      ${statCard('clipboard', allL.length, 'Total pengajuan', 'primary')}
+      ${statCard('clock', active.filter(l => ['wali', 'kurikulum'].includes(l.status)).length, 'Dalam proses', 'warning')}
+      ${statCard('checkCircle', allL.filter(l => l.status === 'disetujui').length, 'Disetujui', 'success')}
+      ${statCard('xCircle', allL.filter(l => ['ditolak', 'kedaluwarsa'].includes(l.status)).length, 'Ditolak / kedaluwarsa', 'danger')}
     </div>` : ''}
     <div class="chips" style="margin-bottom:16px">${filters.map(([k, l, n]) => `<button class="chip ${IzinPan.filter === k ? 'active' : ''}" data-f="${k}">${l}<span class="cnt">${n}</span></button>`).join('')}</div>
-    ${list.length ? `<div class="leave-grid">${list.map(l => this.card(l)).join('')}</div>` : `<div class="card">${emptyState('checkCircle', 'Tidak ada pengajuan', IzinPan.filter === 'aksi' ? 'Semua pengajuan sudah kamu tindak lanjuti.' : 'Tidak ada pengajuan pada kategori ini.')}</div>`}`;
+    ${list.length ? `<div class="leave-grid">${list.map(l => this.card(l)).join('')}</div>` : `<div class="card">${emptyState(IzinPan.filter === 'arsip' ? 'history' : 'checkCircle', IzinPan.filter === 'arsip' ? 'Arsip kosong' : 'Tidak ada pengajuan', IzinPan.filter === 'aksi' ? 'Semua pengajuan sudah kamu tindak lanjuti.' : IzinPan.filter === 'arsip' ? 'Pengajuan untuk sesi yang sudah lewat akan tersimpan di sini.' : 'Tidak ada pengajuan aktif pada kategori ini.')}</div>`}`;
   },
   card(l) {
     const st = Q.student(l.studentId), s = Q.session(l.sessionId), g = Q.grp(s.groupId), sb = Q.subj(s.subjectId), m = LEAVE[l.status];
-    const canWali = l.status === 'wali' && App.has('wali') && Q.waliGroupIds().includes(g.id);
-    const canKur = l.status === 'kurikulum' && App.has('kurikulum');
+    const archived = leaveEnded(l);
+    const canWali = !archived && l.status === 'wali' && App.has('wali') && Q.waliGroupIds().includes(g.id);
+    const canKur = !archived && l.status === 'kurikulum' && App.has('kurikulum');
     return `<div class="leave-card">
-      <div class="leave-head"><div class="cell-user" style="min-width:0">${avatar(st.name)}<div><b>${esc(st.name)}</b><small>${esc(g.name)} · diajukan ${relStamp(l.createdAt)}</small></div></div>${badge(m.short, m.tone)}</div>
+      <div class="leave-head"><div class="cell-user" style="min-width:0">${avatar(st.name)}<div><b>${esc(st.name)}</b><small>${esc(g.name)} · diajukan ${relStamp(l.createdAt)}</small></div></div><div class="row" style="gap:6px">${archived ? badge('Arsip', 'neutral', 'no-dot') : ''}${badge(m.short, m.tone)}</div></div>
       <div class="note primary" style="margin-top:12px">${icon('calendar', 15)}<span>${esc(sb.code)} · ${esc(s.topic)} · ${fmtDay(s.date)}, ${s.start}–${s.end}</span></div>
       <p class="leave-reason"><b>${esc(l.reason)}</b> — ${esc(l.note)}</p>
-      ${l.file ? `<button class="file-chip" data-file="${esc(l.file)}">${icon('clip', 14)}<span>${esc(l.file)}</span></button>` : '<span class="muted small">Tanpa lampiran</span>'}
+      ${l.file ? `<button class="file-chip" data-file="${esc(l.file)}">${icon('clip', 14)}<span>${esc(l.file)}</span></button>` : '<span class="muted small">Tanpa lampiran (data lama)</span>'}
+      ${['ditolak', 'kedaluwarsa'].includes(l.status) ? `<div class="note warning" style="margin-top:8px">${icon('alert', 15)}<span>Pelajar tercatat <b>Tidak hadir</b> pada sesi ini.</span></div>` : ''}
       <details ${canWali || canKur ? '' : 'open'}><summary>${icon('activity', 14)} Lini masa verifikasi</summary>${leaveTimeline(l)}</details>
       ${canWali ? `<div class="leave-actions">
-        <label class="field"><span>Rekomendasi Wali Kelas</span><select data-rec="${l.id}"><option>Direkomendasikan</option><option>Tidak direkomendasikan</option></select></label>
-        <label class="field"><span>Catatan untuk Kurikulum</span><textarea data-note="${l.id}" placeholder="cth. Sudah konfirmasi ke pelajar / orang tua…" style="min-height:70px"></textarea></label>
-        <div class="row"><button class="btn btn-primary btn-sm" data-wali="${l.id}">${icon('send', 14)} Verifikasi & teruskan ke Kurikulum</button></div>
+        <label class="field"><span>Catatan (wajib bila menolak)</span><textarea data-note="${l.id}" placeholder="cth. Sudah konfirmasi ke pelajar / orang tua…" style="min-height:70px"></textarea></label>
+        <div class="row wrap"><button class="btn btn-success btn-sm" data-wali-ok="${l.id}">${icon('check', 14)} Terima & teruskan ke Kurikulum</button><button class="btn btn-danger btn-sm" data-wali-no="${l.id}">${icon('x', 14)} Tolak (pelajar tidak hadir)</button></div>
       </div>` : ''}
       ${canKur ? `<div class="leave-actions">
         <label class="field"><span>Catatan keputusan</span><textarea data-note="${l.id}" placeholder="Catatan ini dapat dilihat pelajar…" style="min-height:70px"></textarea></label>
-        <div class="row"><button class="btn btn-success btn-sm" data-ok="${l.id}">${icon('check', 14)} Setujui</button><button class="btn btn-danger btn-sm" data-no="${l.id}">${icon('x', 14)} Tolak</button></div>
+        <div class="row wrap"><button class="btn btn-success btn-sm" data-ok="${l.id}">${icon('check', 14)} Setujui</button><button class="btn btn-danger btn-sm" data-no="${l.id}">${icon('x', 14)} Tolak (pelajar tidak hadir)</button></div>
       </div>` : ''}
     </div>`;
   },
@@ -869,26 +886,44 @@ PanitiaPages.perizinan = {
       const t = e.target;
       const f = t.closest('[data-f]'); if (f) { IzinPan.filter = f.dataset.f; return App.refresh(); }
       const fl = t.closest('[data-file]'); if (fl) return toast(`Membuka lampiran ${fl.dataset.file} (demo)`, 'info');
-      const w = t.closest('[data-wali]');
-      if (w) {
-        const l = DB.leaves.find(x => x.id === w.dataset.wali);
-        Object.assign(l, { status: 'kurikulum', waliRec: $(`[data-rec="${l.id}"]`, root).value, waliNote: $(`[data-note="${l.id}"]`, root).value.trim(), waliBy: App.user.name, waliAt: stamp() });
-        DB.activity.unshift({ who: App.user.name, what: 'memverifikasi izin', obj: Q.student(l.studentId).name, at: stamp(), icon: 'clipboard' });
-        toast('Diverifikasi & diteruskan ke Kurikulum.'); return App.refresh();
+      const wk = t.closest('[data-wali-ok]'), wn = t.closest('[data-wali-no]');
+      if (wk || wn) {
+        const l = DB.leaves.find(x => x.id === (wk || wn).dataset[wk ? 'waliOk' : 'waliNo']);
+        const note = $(`[data-note="${l.id}"]`, root).value.trim();
+        if (leaveEnded(l)) { toast('Sesi sudah selesai, pengajuan diarsipkan sebagai Tidak hadir.', 'error'); return App.refresh(); }
+        if (wn && !note) { toast('Tuliskan alasan penolakan untuk pelajar.', 'error'); $(`[data-note="${l.id}"]`, root).focus(); return; }
+        const st = Q.student(l.studentId);
+        if (wk) {
+          Object.assign(l, { status: 'kurikulum', waliDecision: 'diterima', waliRec: 'Diterima', waliNote: note, waliBy: App.user.name, waliAt: stamp() });
+          DB.activity.unshift({ who: App.user.name, what: 'menerima izin', obj: st.name, at: stamp(), icon: 'clipboard' });
+          toast('Izin diterima & diteruskan ke Kurikulum.');
+        } else {
+          Object.assign(l, { status: 'ditolak', waliDecision: 'ditolak', waliRec: 'Ditolak', waliNote: note, waliBy: App.user.name, waliAt: stamp() });
+          setAttOverride(l.sessionId, l.studentId, 'alpa', App.user.name, `Izin ditolak Wali Kelas: ${note}`, 'Izin ditolak Wali Kelas → tidak hadir');
+          DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Izin ${st.name} ditolak Wali Kelas → Tidak hadir` });
+          DB.activity.unshift({ who: App.user.name, what: 'menolak izin', obj: st.name, at: stamp(), icon: 'clipboard' });
+          if (st.id === 'p1') DB.notifications.pelajar.unshift({ title: 'Izin ditolak Wali Kelas', text: `${note} · Presensi sesi ini tercatat Tidak hadir.`, at: stamp(), unread: true, icon: 'clipboard' });
+          toast('Izin ditolak. Pelajar tercatat Tidak hadir.', 'info');
+        }
+        return App.refresh();
       }
       const ok = t.closest('[data-ok]'), no = t.closest('[data-no]');
       if (ok || no) {
         const l = DB.leaves.find(x => x.id === (ok || no).dataset[ok ? 'ok' : 'no']);
         const note = $(`[data-note="${l.id}"]`, root).value.trim();
+        if (leaveEnded(l)) { toast('Sesi sudah selesai, pengajuan diarsipkan sebagai Tidak hadir.', 'error'); return App.refresh(); }
         if (no && !note) { toast('Tuliskan catatan alasan penolakan untuk pelajar.', 'error'); $(`[data-note="${l.id}"]`, root).focus(); return; }
         Object.assign(l, { status: ok ? 'disetujui' : 'ditolak', decisionNote: note || 'Disetujui.', decisionBy: App.user.name, decisionAt: stamp() });
         const st = Q.student(l.studentId);
         if (ok) {
           Q.attOf(l.studentId)[l.sessionId] = { status: 'izin', time: null };
           DB.audit.unshift({ who: 'Sistem', at: stamp(), what: `Status presensi ${st.name} otomatis menjadi “Izin” (pengajuan disetujui)` });
+        } else {
+          setAttOverride(l.sessionId, l.studentId, 'alpa', App.user.name, `Izin ditolak Kurikulum: ${note}`, 'Izin ditolak Kurikulum → tidak hadir');
+          DB.audit.unshift({ who: App.user.name, at: stamp(), what: `Izin ${st.name} ditolak Kurikulum → Tidak hadir` });
         }
-        if (st.id === 'p1') DB.notifications.pelajar.unshift({ title: `Izin ${ok ? 'disetujui' : 'ditolak'}`, text: note || 'Pengajuan izinmu disetujui Kurikulum.', at: stamp(), unread: true, icon: 'clipboard' });
-        toast(ok ? 'Izin disetujui. Status presensi otomatis menjadi “Izin”.' : 'Izin ditolak. Catatan dikirim ke pelajar.', ok ? 'success' : 'info');
+        if (st.id === 'p1') DB.notifications.pelajar.unshift({ title: `Izin ${ok ? 'disetujui' : 'ditolak'}`, text: ok ? (note || 'Pengajuan izinmu disetujui Kurikulum.') : `${note} · Presensi sesi ini tercatat Tidak hadir.`, at: stamp(), unread: true, icon: 'clipboard' });
+        toast(ok ? 'Izin disetujui. Status presensi otomatis menjadi “Izin”.' : 'Izin ditolak. Pelajar tercatat Tidak hadir.', ok ? 'success' : 'info');
         return App.refresh();
       }
     });
@@ -1068,13 +1103,13 @@ PanitiaPages.pengaturan = {
     const u = App.user;
     const canSys = App.has('kurikulum');
     const M = [
-      ['Kelompok Kelas & penempatan', 'Lihat kelompok sendiri', 'Lihat (kelompok diajar)', 'Lihat (dampingan)', 'Kelola & tempatkan', 'Pantau', 'Kelola penuh'],
+      ['Kelompok Kelas & penempatan', 'Lihat kelompok sendiri', 'Lihat (kelompok diajar)', 'Lihat (1 kelompok dampingan)', 'Kelola & tempatkan', 'Pantau', 'Kelola penuh'],
       ['Mata Pelajaran', 'Lihat', 'Lihat', 'Lihat', 'Kelola', 'Pantau', 'Kelola penuh'],
       ['Jadwal sesi', 'Lihat', 'Lihat', 'Lihat', 'Kelola + cek bentrok', 'Pantau', 'Kelola penuh'],
       ['Materi (per mapel)', 'Akses', 'Kelola mapel diampu', '–', 'Kelola', 'Pantau', 'Kelola penuh'],
       ['Tugas dan nilai', 'Kumpul, lihat nilai', 'Kelola, menilai', '–', 'Kelola', 'Pantau', 'Kelola penuh'],
-      ['Presensi (lokasi, di room)', 'Tombol lokasi, riwayat, koreksi', 'Buka/tutup sesi sendiri', 'Pantau dampingan', 'Buka/tutup, koreksi, atur lokasi', 'Pantau', 'Kelola penuh'],
-      ['Perizinan (per sesi)', 'Ajukan', '–', 'Verifikasi awal', 'Keputusan akhir', 'Pantau', 'Kelola penuh'],
+      ['Presensi (lokasi, di room)', 'Tombol lokasi, riwayat, koreksi', 'Buka/tutup sesi sendiri', 'Pantau & edit presensi dampingan', 'Buka/tutup, edit, koreksi, atur lokasi', 'Pantau', 'Kelola penuh'],
+      ['Perizinan (per sesi)', 'Ajukan + lampiran wajib', '–', 'Terima / tolak', 'Keputusan (izin yang diterima Wali)', 'Pantau', 'Kelola penuh'],
       ['Laporan perkembangan', 'Milik sendiri', 'Kelompok diajar', 'Pelajar dampingan', 'Menyeluruh, input tryout', 'Menyeluruh', 'Menyeluruh'],
       ['Pengguna & peran', '–', '–', '–', '–', '–', 'Kelola'],
     ];
@@ -1102,7 +1137,7 @@ PanitiaPages.pengaturan = {
         <div class="card">
           <div class="card-head"><h3>${icon('locate', 16)} Pengaturan presensi</h3>${canSys ? '' : badge('Hanya Kurikulum/Admin', 'neutral', 'no-dot')}</div>
           <div class="form-grid">
-            <label class="field"><span>Toleransi keterlambatan sejak presensi dibuka (menit)</span><input type="number" id="st-late" value="${DB.settings.lateTolerance}" min="0" max="60" ${canSys ? '' : 'disabled'}></label>
+            <label class="field"><span>Batas Hadir sejak presensi dibuka (menit)</span><input type="number" id="st-late" value="${DB.settings.lateTolerance}" min="0" max="60" ${canSys ? '' : 'disabled'}></label>
             <label class="field"><span>Radius area presensi (meter)</span><input type="number" id="st-radius" value="${DB.settings.geoRadius}" min="20" max="1000" ${canSys ? '' : 'disabled'}><small class="muted small">Pelajar harus berada dalam radius ini dari titik lokasi tempat sesi.</small></label>
             <label class="field"><span>Batas pengajuan izin</span><select id="st-izin" ${canSys ? '' : 'disabled'}>${['H-0', 'H-1', 'H-2'].map(v => `<option ${DB.settings.leaveDeadline === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
             <label class="field"><span>Batas pengajuan koreksi presensi (hari)</span><input type="number" id="st-corr" value="${DB.settings.correctionWindow}" min="1" max="7" ${canSys ? '' : 'disabled'}></label>
@@ -1121,7 +1156,8 @@ PanitiaPages.pengaturan = {
         </div>
         <div class="card mt">
           <div class="card-head"><h3>${icon('bell', 16)} Notifikasi</h3></div>
-          ${[['Pengajuan izin baru', true], ['Pengumpulan tugas', true], ['Koreksi presensi', true], ['Ringkasan harian via email', false]].map(([t, on]) => `<div class="setting-row"><div><b>${t}</b></div><label class="switch"><input type="checkbox" ${on ? 'checked' : ''} data-toggle><span></span></label></div>`).join('')}
+          <p class="muted small" style="margin-bottom:8px">Notifikasi hanya tampil di dalam aplikasi (ikon lonceng). Belum ada pengiriman keluar web.</p>
+          ${[['Pengajuan izin baru', true], ['Pengumpulan tugas', true], ['Koreksi presensi', true], ['Ringkasan harian', false]].map(([t, on]) => `<div class="setting-row"><div><b>${t}</b></div><label class="switch"><input type="checkbox" ${on ? 'checked' : ''} data-toggle><span></span></label></div>`).join('')}
         </div>
         <div class="card mt">
           <div class="setting-row"><div><b>Keluar dari akun</b><small>Akhiri sesi di perangkat ini</small></div><button class="btn btn-sm btn-danger" data-action="logout">${icon('logout', 14)} Keluar</button></div>
@@ -1135,11 +1171,13 @@ PanitiaPages.pengaturan = {
       if (e.target.closest('[data-pw]')) return openPasswordModal();
       if (e.target.closest('[data-save-profile]')) return toast('Profil disimpan (demo).');
       if (e.target.closest('[data-add-place]')) {
-        DB.places.push({ id: 'pl' + Date.now(), name: 'Titik baru', match: 'Titik baru', lat: DB.places[0].lat, lng: DB.places[0].lng });
+        if (!App.has('kurikulum')) return toast('Hanya Kurikulum dan Administrator yang dapat mengubah pengaturan presensi dan titik lokasi.', 'error');
+                DB.places.push({ id: 'pl' + Date.now(), name: 'Titik baru', match: 'Titik baru', lat: DB.places[0].lat, lng: DB.places[0].lng });
         return App.refresh();
       }
       if (e.target.closest('[data-here]')) {
-        if (!navigator.geolocation) return toast('Browser tidak mendukung GPS.', 'error');
+        if (!App.has('kurikulum')) return toast('Hanya Kurikulum dan Administrator yang dapat mengubah pengaturan presensi dan titik lokasi.', 'error');
+                if (!navigator.geolocation) return toast('Browser tidak mendukung GPS.', 'error');
         return navigator.geolocation.getCurrentPosition(pos => {
           const row = $$('[data-place]', root).pop();
           row.querySelector('[data-k="lat"]').value = pos.coords.latitude.toFixed(6);
@@ -1148,7 +1186,8 @@ PanitiaPages.pengaturan = {
         }, () => toast('Lokasi tidak dapat diambil. Periksa izin lokasi browser.', 'error'), { enableHighAccuracy: true, timeout: 10000 });
       }
       if (e.target.closest('[data-save-sys]')) {
-        DB.settings.lateTolerance = Number($('#st-late', root).value) || 15;
+        if (!App.has('kurikulum')) return toast('Hanya Kurikulum dan Administrator yang dapat mengubah pengaturan presensi dan titik lokasi.', 'error');
+                DB.settings.lateTolerance = Number($('#st-late', root).value) || 15;
         DB.settings.geoRadius = Math.min(1000, Math.max(20, Number($('#st-radius', root).value) || 100));
         $$('[data-place]', root).forEach(row => {
           const pl = DB.places.find(p => p.id === row.dataset.place); if (!pl) return;

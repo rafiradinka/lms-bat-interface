@@ -242,7 +242,7 @@ PelajarPages.presensi = {
     ${todays.length ? `<div class="note primary" style="margin:0 0 16px">${icon('locate', 15)}<span>Ada sesi hari ini: ${todays.map(s => `<a href="#/sesi/${s.id}" style="text-decoration:underline;font-weight:700">${esc(Q.subj(s.subjectId).code)} · ${s.start}</a>`).join(', ')}. Masuk ke room untuk presensi.</span></div>` : ''}
     <div class="stats">
       ${statCard('checkCircle', st.pct + '%', 'Kehadiran', 'success', `${st.hadir + st.terlambat} dari ${st.total} sesi`)}
-      ${statCard('target', st.score, 'Skor presensi', 'primary', 'Hadir 1 · Terlambat 0,5 · Tidak hadir 0')}
+      ${statCard('xCircle', st.alpa, 'Tidak hadir', 'danger')}
       ${statCard('clock', st.terlambat, 'Terlambat', 'warning')}
       ${statCard('clipboard', st.izin, 'Izin disetujui', 'info')}
     </div>
@@ -258,10 +258,10 @@ PelajarPages.presensi = {
         ${attSummary(st)}
         <div class="divider"></div>
         <div class="kv">
-          <div><span>${badge('Hadir', 'success')}</span><b class="small muted" style="font-weight:500">Presensi lokasi sebelum batas waktu · 1 poin</b></div>
-          <div><span>${badge('Terlambat', 'warning')}</span><b class="small muted" style="font-weight:500">Lewat ${DB.settings.lateTolerance} menit sejak dibuka · 0,5 poin</b></div>
-          <div><span>${badge('Izin', 'info')}</span><b class="small muted" style="font-weight:500">Izin disetujui · tidak dihitung</b></div>
-          <div><span>${badge('Tidak hadir', 'danger')}</span><b class="small muted" style="font-weight:500">Tanpa presensi & tanpa izin · 0 poin</b></div>
+          <div><span>${badge('Hadir', 'success')}</span><b class="small muted" style="font-weight:500">Presensi dalam ${DB.settings.lateTolerance} menit pertama sejak dibuka</b></div>
+          <div><span>${badge('Terlambat', 'warning')}</span><b class="small muted" style="font-weight:500">Presensi setelah ${DB.settings.lateTolerance} menit pertama, sampai jam pelajaran selesai</b></div>
+          <div><span>${badge('Izin', 'info')}</span><b class="small muted" style="font-weight:500">Pengajuan izin disetujui Wali Kelas dan Kurikulum</b></div>
+          <div><span>${badge('Tidak hadir', 'danger')}</span><b class="small muted" style="font-weight:500">Tidak presensi sampai jam selesai, atau izin ditolak / tidak ditindak</b></div>
         </div>
       </div>
     </div>`;
@@ -271,13 +271,13 @@ PelajarPages.presensi = {
     const rows = DB.sessions.filter(s => rec[s.id] && s.date <= todayStr())
       .filter(s => PresensiPel.filter === 'semua' || rec[s.id].status === PresensiPel.filter).reverse();
     if (!rows.length) return emptyState('history', 'Belum ada data', 'Tidak ada riwayat pada kategori ini.');
-    return `<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Mapel</th><th>Topik</th><th>Waktu</th><th>Status</th><th>Poin</th><th></th></tr></thead><tbody>
+    return `<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Mapel</th><th>Topik</th><th>Waktu</th><th>Status</th><th></th></tr></thead><tbody>
       ${rows.map(s => {
         const r = rec[s.id], m = ATT[r.status];
         const corr = DB.corrections.find(k => k.studentId === me.id && k.sessionId === s.id);
         const act = corr ? badge(corr.status === 'pending' ? 'Koreksi diproses' : corr.status === 'approved' ? 'Koreksi disetujui' : 'Koreksi ditolak', corr.status === 'pending' ? 'neutral' : corr.status === 'approved' ? 'success' : 'danger')
           : ['alpa', 'terlambat'].includes(r.status) ? `<button class="btn btn-sm btn-ghost" data-correct="${s.id}">Ajukan koreksi</button>` : '';
-        return `<tr><td><b>${fmtDay(s.date)}</b></td><td>${stag(Q.subj(s.subjectId))}</td><td><a class="ellipsis" href="#/sesi/${s.id}" style="color:inherit">${esc(s.topic)}</a></td><td>${r.time ? r.time + ' WIB' : '—'}</td><td>${badge(m.label, m.tone)}</td><td><b>${fmtPoint(r.status)}</b></td><td style="text-align:right">${act}</td></tr>`;
+        return `<tr><td><b>${fmtDay(s.date)}</b></td><td>${stag(Q.subj(s.subjectId))}</td><td><a class="ellipsis" href="#/sesi/${s.id}" style="color:inherit">${esc(s.topic)}</a></td><td>${r.time ? r.time + ' WIB' : '—'}</td><td>${badge(m.label, m.tone)}</td><td style="text-align:right">${act}</td></tr>`;
       }).join('')}
     </tbody></table></div>`;
   },
@@ -298,15 +298,17 @@ PelajarPages.izin = {
   title: 'Izin',
   render() {
     const me = Q.me();
-    const mine = DB.leaves.filter(l => l.studentId === me.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const allL = DB.leaves.filter(l => l.studentId === me.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    // Hanya pengajuan untuk sesi yang belum lewat yang aktif; sesi yang sudah lewat masuk arsip
+    const mine = allL.filter(l => !leaveEnded(l)), arsip = allL.filter(leaveEnded);
     const wali = Q.waliOf(me);
     const steps = ['Pilih satu sesi', 'Alasan', 'Lampiran & kirim'];
     return `
-    <div class="page-head"><div><h1>Pengajuan Izin</h1><p>Satu pengajuan berlaku untuk <b>satu sesi</b>. Jika disetujui, status presensi sesi tersebut otomatis menjadi “Izin”.</p></div></div>
+    <div class="page-head"><div><h1>Pengajuan Izin</h1><p>Satu pengajuan berlaku untuk <b>satu sesi</b> dan wajib menyertakan <b>lampiran bukti</b>. Jika disetujui, status presensi sesi tersebut otomatis menjadi “Izin”. Jika ditolak atau tidak ditindak sampai sesi selesai, tercatat <b>Tidak hadir</b>.</p></div></div>
     <div class="flow">
       <span class="flow-step"><i>1</i> Pelajar mengisi formulir</span><span class="arrow">${icon('arrowRight', 14)}</span>
-      <span class="flow-step"><i>2</i> Wali Kelas verifikasi awal</span><span class="arrow">${icon('arrowRight', 14)}</span>
-      <span class="flow-step"><i>3</i> Kurikulum memutuskan</span><span class="arrow">${icon('arrowRight', 14)}</span>
+      <span class="flow-step"><i>2</i> Wali Kelas terima / tolak</span><span class="arrow">${icon('arrowRight', 14)}</span>
+      <span class="flow-step"><i>3</i> Kurikulum memutuskan (bila diterima)</span><span class="arrow">${icon('arrowRight', 14)}</span>
       <span class="flow-step"><i>✓</i> Presensi diperbarui</span>
     </div>
     <div class="cols cols-3-2">
@@ -317,16 +319,19 @@ PelajarPages.izin = {
       </div>
       <div class="card">
         <div class="card-head"><h3>${icon('history', 16)} Riwayat pengajuan</h3>${badge(mine.length + ' pengajuan', 'neutral', 'no-dot')}</div>
-        ${mine.length ? mine.map((l, i) => {
-          const s = Q.session(l.sessionId), sb = Q.subj(s.subjectId), m = LEAVE[l.status];
-          return `<div class="leave-card">
-            <div class="leave-head"><div><b>${esc(sb.code)} · ${esc(s.topic)}</b><span>${fmtDay(s.date)}, ${s.start}–${s.end}</span></div>${badge(m.short, m.tone)}</div>
-            <p class="leave-reason"><b>${esc(l.reason)}</b> — ${esc(l.note)}</p>
-            ${l.file ? `<span class="file-chip">${icon('clip', 14)}<span>${esc(l.file)}</span></span>` : '<span class="muted small">Tanpa lampiran</span>'}
-            <details ${i === 0 ? 'open' : ''}><summary>${icon('activity', 14)} Lini masa verifikasi</summary>${leaveTimeline(l)}</details>
-          </div>`;
-        }).join('') : emptyState('clipboard', 'Belum ada pengajuan', 'Riwayat pengajuan izinmu akan muncul di sini.')}
+        ${mine.length ? mine.map((l, i) => this.leaveCard(l, i === 0)).join('') : emptyState('clipboard', 'Belum ada pengajuan aktif', 'Pengajuan untuk sesi yang belum lewat akan muncul di sini.')}
+        ${arsip.length ? `<details class="mt"><summary class="small" style="cursor:pointer;font-weight:700">${icon('history', 14)} Arsip (${arsip.length}) · sesi sudah lewat</summary><div style="margin-top:10px">${arsip.map(l => this.leaveCard(l, false)).join('')}</div></details>` : ''}
       </div>
+    </div>`;
+  },
+  leaveCard(l, open) {
+    const s = Q.session(l.sessionId), sb = Q.subj(s.subjectId), m = LEAVE[l.status];
+    return `<div class="leave-card">
+      <div class="leave-head"><div><b>${esc(sb.code)} · ${esc(s.topic)}</b><span>${fmtDay(s.date)}, ${s.start}–${s.end}</span></div>${badge(m.short, m.tone)}</div>
+      <p class="leave-reason"><b>${esc(l.reason)}</b> — ${esc(l.note)}</p>
+      ${l.file ? `<span class="file-chip">${icon('clip', 14)}<span>${esc(l.file)}</span></span>` : ''}
+      ${['ditolak', 'kedaluwarsa'].includes(l.status) ? `<div class="note warning" style="margin-top:8px">${icon('alert', 15)}<span>Presensi sesi ini tercatat <b>Tidak hadir</b>.</span></div>` : ''}
+      <details ${open ? 'open' : ''}><summary>${icon('activity', 14)} Lini masa verifikasi</summary>${leaveTimeline(l)}</details>
     </div>`;
   },
   step(me, wali) {
@@ -344,7 +349,7 @@ PelajarPages.izin = {
         <div class="step-actions"><button class="btn btn-ghost" data-izin="back">${icon('left', 16)} Kembali</button><button class="btn btn-primary" data-izin="next">Lanjut ${icon('arrowRight', 16)}</button></div>`;
     }
     const s = Q.session(S.sessionId), sb = Q.subj(s.subjectId);
-    return `<div class="field"><span>Lampiran pendukung <span class="muted">(opsional, boleh dikosongkan)</span></span>${dropzone('iz-file', 'Surat dokter, surat dispensasi, undangan, dll.')}</div>
+    return `<div class="field" id="iz-file-field"><span>Lampiran bukti <span class="text-danger">(wajib)</span></span>${dropzone('iz-file', 'Surat dokter, surat dispensasi, undangan, dll.')}<small class="field-err" id="iz-file-err"></small></div>
       <div class="card mt" style="background:var(--surface-2)">
         <div class="card-head" style="margin-bottom:6px"><h3>Ringkasan pengajuan</h3></div>
         <div class="kv">
@@ -354,10 +359,10 @@ PelajarPages.izin = {
           <div><span>Tanggal</span><b>${fmtDay(s.date)}, ${s.start}–${s.end}</b></div>
           <div><span>Alasan</span><b>${esc(S.reason)}</b></div>
           <div><span>Keterangan</span><b style="max-width:60%">${esc(S.note)}</b></div>
-          <div><span>Lampiran</span><b>${S.file ? esc(S.file) : 'Tidak ada'}</b></div>
+          <div><span>Lampiran</span><b>${S.file ? esc(S.file) : '<span class="text-danger">Belum dilampirkan</span>'}</b></div>
         </div>
       </div>
-      <div class="note primary">${icon('shield', 15)}<span>Pengajuan akan diverifikasi oleh Wali Kelas <b>${esc(wali)}</b>, lalu diputuskan oleh Kurikulum.</span></div>
+      <div class="note primary">${icon('shield', 15)}<span>Pengajuan diputuskan dulu oleh Wali Kelas <b>${esc(wali)}</b>. Jika diterima, diteruskan ke Kurikulum untuk keputusan akhir. Jika ditolak atau tidak ditindak sampai sesi selesai, kamu tercatat <b>Tidak hadir</b>.</span></div>
       <div class="step-actions"><button class="btn btn-ghost" data-izin="back">${icon('left', 16)} Kembali</button><button class="btn btn-primary" data-izin="submit">${icon('send', 16)} Kirim pengajuan</button></div>`;
   },
   mount(root) {
@@ -384,9 +389,10 @@ PelajarPages.izin = {
         IzinState.step++; return App.refresh();
       }
       if (act === 'submit') {
+        if (!IzinState.file) { $('#iz-file-field', root).classList.add('invalid'); $('#iz-file-err', root).textContent = 'Lampiran bukti wajib diunggah.'; return toast('Lampirkan bukti izin terlebih dahulu.', 'error'); }
         b.classList.add('loading');
         setTimeout(() => {
-          DB.leaves.push({ id: 'L' + Date.now(), studentId: me.id, sessionId: IzinState.sessionId, reason: IzinState.reason, note: IzinState.note.trim(), file: IzinState.file || null, createdAt: stamp(), status: 'wali',
+          DB.leaves.push({ id: 'L' + Date.now(), studentId: me.id, sessionId: IzinState.sessionId, reason: IzinState.reason, note: IzinState.note.trim(), file: IzinState.file, createdAt: stamp(), status: 'wali', waliDecision: '', expiredAt: '',
             waliNote: '', waliRec: '', waliBy: '', waliAt: '', decisionNote: '', decisionBy: '', decisionAt: '' });
           DB.notifications.panitia.unshift({ title: 'Pengajuan izin baru', text: `${me.name} · ${IzinState.reason}`, at: stamp(), unread: true, icon: 'clipboard' });
           Object.assign(IzinState, { step: 1, sessionId: null, reason: '', note: '', file: '' });
@@ -423,7 +429,7 @@ PelajarPages.laporan = {
       <div class="actions"><button class="btn btn-ghost" data-pdf>${icon('download', 16)} Unduh laporan</button></div>
     </div>
     <div class="stats">
-      ${statCard('checkCircle', st.pct + '%', 'Kehadiran', 'success', `${st.total} sesi tercatat · skor presensi ${st.score}`)}
+      ${statCard('checkCircle', st.pct + '%', 'Kehadiran', 'success', `${st.total} sesi tercatat`)}
       ${statCard('target', Q.taskAvg(me.id), 'Rata-rata nilai tugas', 'primary', `${graded.length} tugas dinilai`)}
       ${statCard('file', `${done}/${tasks.length}`, 'Tugas terkumpul', 'info', `${tasks.length ? Math.round(done / tasks.length * 100) : 0}% progres`)}
       ${statCard('trending', Q.toAvg(last), 'Rata-rata tryout', 'accent', `${Q.toAvg(last) - Q.toAvg(prev) >= 0 ? '▲ +' : '▼ '}${Q.toAvg(last) - Q.toAvg(prev)} dari TO sebelumnya`)}

@@ -47,6 +47,7 @@ const DB = (() => {
     { id: 'st6', name: 'Fajar Nugroho', email: 'fajar@bat.id', role: 'wali', subjects: [] },
     { id: 'st7', name: 'Wulan Sari', email: 'wulan@bat.id', role: 'wali', subjects: [] },
     { id: 'st8', name: 'Putri Maharani', email: 'putri.m@bat.id', role: 'wali', subjects: [] },
+    { id: 'st12', name: 'Maya Anggraini', email: 'maya@bat.id', role: 'wali', subjects: [] },
     { id: 'st9', name: 'Anindya Kirana', email: 'kurikulum@bat.id', role: 'kurikulum', subjects: [] },
     { id: 'st10', name: 'Bima Satria', email: 'ketua@bat.id', role: 'ketua', subjects: [] },
     { id: 'st11', name: 'Teguh Santoso', email: 'admin@bat.id', role: 'admin', subjects: [] },
@@ -84,11 +85,11 @@ const DB = (() => {
   const groups = [
     { id: 'g1', name: 'Saintek A', color: '#8b7bff', wali: 'Fajar Nugroho',
       desc: 'Kelompok persiapan SNBT Saintek dengan fokus Pengetahuan Kuantitatif, Penalaran Matematika, dan Penalaran Umum.' },
-    { id: 'g2', name: 'Saintek B', color: '#22d3ee', wali: 'Fajar Nugroho',
+    { id: 'g2', name: 'Saintek B', color: '#22d3ee', wali: 'Putri Maharani',
       desc: 'Kelompok paralel Saintek dengan tambahan Literasi Bahasa Inggris.' },
     { id: 'g3', name: 'Soshum A', color: '#ffb547', wali: 'Wulan Sari',
       desc: 'Kelompok persiapan SNBT Soshum: literasi, pemahaman bacaan, dan pengetahuan umum.' },
-    { id: 'g4', name: 'Gap Year', color: '#f472b6', wali: 'Wulan Sari',
+    { id: 'g4', name: 'Gap Year', color: '#f472b6', wali: 'Maya Anggraini',
       desc: 'Kelompok untuk alumni dan pejuang gap year dengan ritme intensif di pagi hari.' },
   ];
 
@@ -245,28 +246,29 @@ const DB = (() => {
   }
   // Status presensi langsung per room (dibuka/ditutup tutor, daftar hadir)
   const rooms = {};
+  // Penimpaan presensi (edit panitia, izin ditolak/kedaluwarsa): { [sessionId]: { [studentId]: { status, time, by, note, via, at } } }
+  const attEdits = {};
 
   /* ---------- Perizinan (satu pengajuan = satu sesi, lampiran opsional) ---------- */
   const leaves = [];
-  const addLeave = o => leaves.push(Object.assign({ file: null, waliNote: '', waliRec: '', waliBy: '', waliAt: '', decisionNote: '', decisionBy: '', decisionAt: '' }, o));
+  const addLeave = o => leaves.push(Object.assign({ file: null, waliDecision: '', expiredAt: '', waliNote: '', waliRec: '', waliBy: '', waliAt: '', decisionNote: '', decisionBy: '', decisionAt: '' }, o));
   const n1 = nextOf('g1', 1), n2 = nextOf('g1', 0), n3 = nextOf('g1', 2), n4 = nextOf('g3', 0), n5 = nextOf('g4', 0), n6 = nextOf('g3', 1);
   if (n1) addLeave({ id: 'L2', studentId: 'p1', sessionId: n1.id, reason: 'Kegiatan sekolah', note: 'Mengikuti lomba debat tingkat provinsi mewakili sekolah.', file: 'Surat_Dispensasi_Sekolah.pdf', createdAt: `${D(0)} 07:42`, status: 'wali' });
   if (sIzin) addLeave({ id: 'L1', studentId: 'p1', sessionId: sIzin.id, reason: 'Sakit', note: 'Demam sejak pagi, sudah periksa ke puskesmas.', file: 'Surat_Keterangan_Dokter.jpg', createdAt: `${sIzin.date} 08:10`, status: 'disetujui',
-    waliRec: 'Direkomendasikan', waliNote: 'Sudah konfirmasi dengan Nadia, kondisinya memang sakit.', waliBy: 'Fajar Nugroho', waliAt: `${sIzin.date} 09:02`,
+    waliDecision: 'diterima', waliRec: 'Diterima', waliNote: 'Sudah konfirmasi dengan Nadia, kondisinya memang sakit.', waliBy: 'Fajar Nugroho', waliAt: `${sIzin.date} 09:02`,
     decisionNote: 'Disetujui. Semoga lekas sembuh!', decisionBy: 'Anindya Kirana', decisionAt: `${sIzin.date} 11:30` });
-  if (n2) addLeave({ id: 'L3', studentId: 'p2', sessionId: n2.id, reason: 'Keperluan keluarga', note: 'Menghadiri pernikahan kakak di Klaten.', file: null, createdAt: `${D(-1)} 20:15`, status: 'wali' });
+  if (n2) addLeave({ id: 'L3', studentId: 'p2', sessionId: n2.id, reason: 'Keperluan keluarga', note: 'Menghadiri pernikahan kakak di Klaten.', file: 'Undangan_Pernikahan.jpg', createdAt: `${D(-1)} 20:15`, status: 'wali' });
   if (n3) addLeave({ id: 'L4', studentId: 'p3', sessionId: n3.id, reason: 'Kegiatan sekolah', note: 'Ujian praktik kimia dijadwalkan ulang ke sore hari.', file: 'Jadwal_Ujian_Praktik.pdf', createdAt: `${D(-2)} 16:20`, status: 'kurikulum',
-    waliRec: 'Direkomendasikan', waliNote: 'Jadwal ujian sudah saya cek ke wali kelas sekolahnya.', waliBy: 'Fajar Nugroho', waliAt: `${D(-1)} 08:05` });
-  if (n4) addLeave({ id: 'L5', studentId: 'p4', sessionId: n4.id, reason: 'Lainnya', note: 'Ingin menonton konser bersama teman.', file: null, createdAt: `${D(-3)} 21:44`, status: 'ditolak',
-    waliRec: 'Tidak direkomendasikan', waliNote: 'Alasan kurang mendesak, sesi ini materi penting.', waliBy: 'Wulan Sari', waliAt: `${D(-2)} 10:00`,
-    decisionNote: 'Ditolak karena bukan alasan mendesak. Silakan tetap hadir ya.', decisionBy: 'Anindya Kirana', decisionAt: `${D(-2)} 15:12` });
+    waliDecision: 'diterima', waliRec: 'Diterima', waliNote: 'Jadwal ujian sudah saya cek ke wali kelas sekolahnya.', waliBy: 'Fajar Nugroho', waliAt: `${D(-1)} 08:05` });
+  if (n4) addLeave({ id: 'L5', studentId: 'p4', sessionId: n4.id, reason: 'Lainnya', note: 'Ingin menonton konser bersama teman.', file: 'Tiket_Konser.jpg', createdAt: `${D(-3)} 21:44`, status: 'ditolak',
+    waliDecision: 'ditolak', waliRec: 'Ditolak', waliNote: 'Alasan kurang mendesak, sesi ini materi penting. Silakan tetap hadir ya.', waliBy: 'Wulan Sari', waliAt: `${D(-2)} 10:00` });
   if (n5) addLeave({ id: 'L6', studentId: 'p5', sessionId: n5.id, reason: 'Sakit', note: 'Pemulihan pasca operasi gigi bungsu.', file: 'Surat_Dokter_Gigi.pdf', createdAt: `${D(-1)} 09:30`, status: 'kurikulum',
-    waliRec: 'Direkomendasikan', waliNote: 'Surat dokter valid.', waliBy: 'Wulan Sari', waliAt: `${D(-1)} 13:45` });
-  if (n6) addLeave({ id: 'L7', studentId: 'p7', sessionId: n6.id, reason: 'Kendala transportasi', note: 'Motor sedang diservis, belum ada tumpangan.', file: null, createdAt: `${D(0)} 06:58`, status: 'wali' });
+    waliDecision: 'diterima', waliRec: 'Diterima', waliNote: 'Surat dokter valid.', waliBy: 'Maya Anggraini', waliAt: `${D(-1)} 13:45` });
+  if (n6) addLeave({ id: 'L7', studentId: 'p7', sessionId: n6.id, reason: 'Kendala transportasi', note: 'Motor sedang diservis, belum ada tumpangan.', file: 'Nota_Servis_Motor.jpg', createdAt: `${D(0)} 06:58`, status: 'wali' });
   // Izin H-1 yang sudah disetujui untuk sesi hari ini → otomatis tercatat "Izin" di rekap room
   const tdG1 = sessions.find(s => s.groupId === 'g1' && s.date === T);
   if (tdG1) addLeave({ id: 'L8', studentId: 'p6', sessionId: tdG1.id, reason: 'Sakit', note: 'Rawat jalan pasca demam berdarah, surat dokter terlampir.', file: 'Surat_Dokter_Yoga.pdf', createdAt: `${D(-1)} 16:10`, status: 'disetujui',
-    waliRec: 'Direkomendasikan', waliNote: 'Orang tua sudah mengonfirmasi.', waliBy: 'Fajar Nugroho', waliAt: `${D(-1)} 18:00`,
+    waliDecision: 'diterima', waliRec: 'Diterima', waliNote: 'Orang tua sudah mengonfirmasi.', waliBy: 'Fajar Nugroho', waliAt: `${D(-1)} 18:00`,
     decisionNote: 'Disetujui. Semoga lekas pulih.', decisionBy: 'Anindya Kirana', decisionAt: `${D(-1)} 19:30` });
 
   /* ---------- Koreksi presensi & audit ---------- */
@@ -285,7 +287,7 @@ const DB = (() => {
   const announcements = [
     { id: 'n1', scope: 'umum', title: 'Pendaftaran Tryout Eksternal #5 dibuka', body: 'Daftarkan dirimu sebelum Minggu. Hasil tryout akan diinput panitia ke laporan perkembanganmu.', date: D(0), by: 'Kurikulum', pinned: true },
     { id: 'n2', scope: 'kelompok', groupId: 'g1', title: 'Perubahan ruang Saintek A', body: 'Salah satu sesi minggu depan pindah ke Ruang 4 karena Ruang 2 dipakai rapat panitia.', date: D(-1), by: 'Fajar Nugroho' },
-    { id: 'n4', scope: 'kelompok', groupId: 'g2', title: 'Sesi berikutnya diundur 30 menit', body: 'Sesi terdekat Saintek B dimulai 30 menit lebih lambat dari biasanya.', date: D(-2), by: 'Fajar Nugroho' },
+    { id: 'n4', scope: 'kelompok', groupId: 'g2', title: 'Sesi berikutnya diundur 30 menit', body: 'Sesi terdekat Saintek B dimulai 30 menit lebih lambat dari biasanya.', date: D(-2), by: 'Putri Maharani' },
     { id: 'n5', scope: 'umum', title: 'Pengingat: ajukan izin minimal H-1', body: 'Satu pengajuan untuk satu sesi. Diverifikasi Wali Kelas lalu diputuskan Kurikulum.', date: D(-5), by: 'Kurikulum' },
     { id: 'n6', scope: 'kelompok', groupId: 'g3', title: 'Bawa kamus KBBI', body: 'Sesi literasi minggu ini butuh akses KBBI di HP masing-masing.', date: D(-3), by: 'Salsabila Azzahra' },
   ];
@@ -338,6 +340,6 @@ const DB = (() => {
   return {
     today, T, ymd, D, addMin, sortSessions,
     roles, accounts, staff, subjects, groups, students, sessions, attendance, assignments, materials,
-    leaves, corrections, audit, announcements, tryouts, notes, activity, notifications, settings, places, rooms,
+    leaves, corrections, audit, announcements, tryouts, notes, activity, notifications, settings, places, rooms, attEdits,
   };
 })();
