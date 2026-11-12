@@ -65,7 +65,7 @@ PelajarPages.beranda = {
     <div class="cols cols-3-2">
       <div class="card">
         <div class="card-head"><h3>${icon('trending', 16)} Ringkasan nilai tugas</h3><a class="link" href="#/laporan">Laporan lengkap ${icon('right', 14)}</a></div>
-        ${graded.length ? lineChart(graded.map(a => ({ label: a.title.split(' ').slice(0, 2).join(' '), value: a.my.score })), { min: 50, max: 100, h: 200 }) : emptyState('chart', 'Belum ada nilai')}
+        ${graded.length ? lineChart(graded.map(a => ({ label: a.title.split(' ').slice(0, 2).join(' '), value: a.my.score })), { min: 50, max: 100, h: 340 }) : emptyState('chart', 'Belum ada nilai')}
       </div>
       <div class="card">
         <div class="card-head"><h3>${icon('calendar', 16)} Sesi 7 hari ke depan</h3><a class="link" href="#/jadwal">Jadwal ${icon('right', 14)}</a></div>
@@ -192,7 +192,7 @@ PelajarPages.tugas = {
     let file = null;
     openModal({
       title: 'Kumpulkan tugas', sub: `${sb.code} · ${a.title}`,
-      body: `<div class="feedback" style="border-left-color:${sb.color}">${esc(a.desc)}</div>
+      body: `<div class="feedback">${esc(a.desc)}</div>
         <div class="meta-row"><span>${icon('clock', 14)} Tenggat ${fmtDay(a.deadline)}, ${a.time} (${relDay(a.deadline)})</span></div>
         <div class="field"><span>Berkas tugas</span>${dropzone('sub-file', 'PDF, DOCX, JPG, PNG · maks. 10 MB')}<small class="field-err" id="sub-err"></small></div>
         <label class="field"><span>Catatan untuk tutor (opsional)</span><textarea id="sub-note" placeholder="cth. Nomor 7 saya masih ragu caranya…"></textarea></label>`,
@@ -271,13 +271,13 @@ PelajarPages.presensi = {
     const rows = DB.sessions.filter(s => rec[s.id] && s.date <= todayStr())
       .filter(s => PresensiPel.filter === 'semua' || rec[s.id].status === PresensiPel.filter).reverse();
     if (!rows.length) return emptyState('history', 'Belum ada data', 'Tidak ada riwayat pada kategori ini.');
-    return `<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Mapel</th><th>Topik</th><th>Waktu</th><th>Status</th><th></th></tr></thead><tbody>
+    return `<div class="table-wrap"><table class="att-table"><thead><tr><th>Tanggal</th><th>Mapel</th><th>Topik</th><th>Waktu</th><th>Status</th><th></th></tr></thead><tbody>
       ${rows.map(s => {
         const r = rec[s.id], m = ATT[r.status];
         const corr = DB.corrections.find(k => k.studentId === me.id && k.sessionId === s.id);
         const act = corr ? badge(corr.status === 'pending' ? 'Koreksi diproses' : corr.status === 'approved' ? 'Koreksi disetujui' : 'Koreksi ditolak', corr.status === 'pending' ? 'neutral' : corr.status === 'approved' ? 'success' : 'danger')
           : ['alpa', 'terlambat'].includes(r.status) ? `<button class="btn btn-sm btn-ghost" data-correct="${s.id}">Ajukan koreksi</button>` : '';
-        return `<tr><td><b>${fmtDay(s.date)}</b></td><td>${stag(Q.subj(s.subjectId))}</td><td><a class="ellipsis" href="#/sesi/${s.id}" style="color:inherit">${esc(s.topic)}</a></td><td>${r.time ? r.time + ' WIB' : '—'}</td><td>${badge(m.label, m.tone)}</td><td style="text-align:right">${act}</td></tr>`;
+        return `<tr><td><b>${fmtDay(s.date)}</b></td><td>${stag(Q.subj(s.subjectId))}</td><td><a class="ellipsis" href="#/sesi/${s.id}" style="color:inherit">${esc(s.topic)}</a></td><td>${r.time ? r.time + ' WIB' : '—'}</td><td>${attMark(r.status)}</td><td style="text-align:right">${act}</td></tr>`;
       }).join('')}
     </tbody></table></div>`;
   },
@@ -309,7 +309,7 @@ PelajarPages.izin = {
       <span class="flow-step"><i>1</i> Pelajar mengisi formulir</span><span class="arrow">${icon('arrowRight', 14)}</span>
       <span class="flow-step"><i>2</i> Wali Kelas terima / tolak</span><span class="arrow">${icon('arrowRight', 14)}</span>
       <span class="flow-step"><i>3</i> Kurikulum memutuskan (bila diterima)</span><span class="arrow">${icon('arrowRight', 14)}</span>
-      <span class="flow-step"><i>✓</i> Presensi diperbarui</span>
+      <span class="flow-step"><i>${icon('check', 12)}</i> Presensi diperbarui</span>
     </div>
     <div class="cols cols-3-2">
       <div class="card">
@@ -432,7 +432,7 @@ PelajarPages.laporan = {
       ${statCard('checkCircle', st.pct + '%', 'Kehadiran', 'success', `${st.total} sesi tercatat`)}
       ${statCard('target', Q.taskAvg(me.id), 'Rata-rata nilai tugas', 'primary', `${graded.length} tugas dinilai`)}
       ${statCard('file', `${done}/${tasks.length}`, 'Tugas terkumpul', 'info', `${tasks.length ? Math.round(done / tasks.length * 100) : 0}% progres`)}
-      ${statCard('trending', Q.toAvg(last), 'Rata-rata tryout', 'accent', `${Q.toAvg(last) - Q.toAvg(prev) >= 0 ? '▲ +' : '▼ '}${Q.toAvg(last) - Q.toAvg(prev)} dari TO sebelumnya`)}
+      ${statCard('trending', Q.toAvg(last), 'Rata-rata tryout', 'accent', `${trendMark(Q.toAvg(last) - Q.toAvg(prev))} dari TO sebelumnya`)}
     </div>
     <div class="cols cols-1-1">
       <div class="card">
@@ -452,10 +452,10 @@ PelajarPages.laporan = {
     <div class="cols cols-3-2">
       <div class="card">
         <div class="card-head"><h3>Performa tryout eksternal</h3><span class="muted small">Diinput oleh Kurikulum</span></div>
-        ${lineChart(tos.map((t, i) => ({ label: 'TO #' + (i + 1), value: Q.toAvg(t) })), { min: 400, max: 700, color: '#ffb547', steps: 3 })}
+        ${lineChart(tos.map((t, i) => ({ label: 'TO #' + (i + 1), value: Q.toAvg(t) })), { min: 400, max: 700, color: '#a0336b', steps: 3 })}
         <div class="divider"></div>
         <div class="table-wrap"><table style="min-width:520px"><thead><tr><th>Subtes</th><th>${esc(prev.name.replace('Tryout Eksternal ', 'TO '))}</th><th>${esc(last.name.replace('Tryout Eksternal ', 'TO '))}</th><th>Perubahan</th></tr></thead><tbody>
-          ${subs.map(k => { const d = last.scores[k] - prev.scores[k]; return `<tr><td><b>${k}</b><div class="muted small">${SUB_NAME[k]}</div></td><td>${prev.scores[k]}</td><td><b>${last.scores[k]}</b></td><td class="${d >= 0 ? 'text-success' : 'text-danger'}"><b>${d >= 0 ? '▲ +' : '▼ '}${d}</b></td></tr>`; }).join('')}
+          ${subs.map(k => { const d = last.scores[k] - prev.scores[k]; return `<tr><td><b>${k}</b><div class="muted small">${SUB_NAME[k]}</div></td><td>${prev.scores[k]}</td><td><b>${last.scores[k]}</b></td><td class="${d >= 0 ? 'text-success' : 'text-danger'}"><b>${trendMark(d)}</b></td></tr>`; }).join('')}
         </tbody></table></div>
       </div>
       <div class="card">

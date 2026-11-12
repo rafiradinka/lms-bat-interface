@@ -87,8 +87,8 @@ PanitiaPages.dashboard = {
     <div class="cols cols-3-2">
       <div class="card">
         <div class="card-head"><h3>${icon('chart', 16)} Ringkasan kehadiran 7 hari terakhir</h3>${badge('Hadir + terlambat', 'neutral', 'no-dot')}</div>
-        ${barChart(days7.map(d => ({ label: fmtDate(d.date, { weekday: 'short', day: 'numeric' }), title: `${fmtDay(d.date)} · ${d.present}/${d.expected} pelajar hadir dari ${d.sessions} sesi`, value: d.pct, color: d.pct == null ? null : toneByPct(d.pct) })), { max: 100, suffix: '%' })}
-        <p class="muted small" style="margin-top:10px">Per hari: total pelajar hadir di seluruh Kelompok Kelas &amp; mapel ÷ total pelajar yang seharusnya hadir hari itu. “—” = tidak ada sesi.</p>
+        ${barChart(days7.map(d => ({ label: fmtDate(d.date, { weekday: 'short', day: 'numeric' }), title: `${fmtDay(d.date)} · ${d.present}/${d.expected} pelajar hadir dari ${d.sessions} sesi`, value: d.pct, color: d.pct == null ? null : d.pct < 70 ? 'var(--danger)' : 'var(--ink)' })), { max: 100, suffix: '%' })}
+        <p class="muted small" style="margin-top:10px">Per hari: total pelajar hadir di seluruh Kelompok Kelas &amp; mapel ÷ total pelajar yang seharusnya hadir hari itu. “—” = tidak ada sesi. Batang merah = kehadiran di bawah 70%.</p>
       </div>
       <div class="card">
         <div class="card-head"><h3>${icon('alert', 16)} Kehadiran terendah</h3>${badge('Global', 'neutral', 'no-dot')}</div>
@@ -272,7 +272,7 @@ function studentDetailModal(id) {
       </div>
       <div class="cols cols-1-1" style="margin-top:0">
         <div class="card" style="background:var(--surface-2)"><div class="card-head"><h3>Kehadiran</h3></div>${attSummary(st, 120)}</div>
-        <div class="card" style="background:var(--surface-2)"><div class="card-head"><h3>Tren tryout eksternal</h3></div>${lineChart(hist.map((v, i) => ({ label: 'TO #' + (i + 1), value: v })), { min: 400, max: 700, color: '#ffb547', steps: 3, h: 200 })}</div>
+        <div class="card" style="background:var(--surface-2)"><div class="card-head"><h3>Tren tryout eksternal</h3></div>${lineChart(hist.map((v, i) => ({ label: 'TO #' + (i + 1), value: v })), { min: 400, max: 700, color: '#a0336b', steps: 3, h: 200 })}</div>
       </div>
       <div class="kv">
         <div><span>Kelompok Kelas</span><b>${tag(g)}</b></div>
@@ -432,7 +432,7 @@ const MapelPage = {
   },
   form(id) {
     const s = id ? Q.subj(id) : null;
-    const colors = ['#34d399', '#8b7bff', '#60a5fa', '#ffb547', '#f472b6', '#22d3ee', '#a3e635', '#fb923c'];
+    const colors = ['#17734a', '#5b4aa8', '#1f5f99', '#a85a0c', '#a0336b', '#0f6f7d', '#5f6d16', '#8a4a2b'];
     openModal({
       title: s ? 'Ubah Mata Pelajaran' : 'Tambah Mata Pelajaran', size: 'lg',
       body: `<div class="form-grid two">
@@ -956,7 +956,7 @@ PanitiaPages.laporan = {
     <div class="stats">
       ${statCard('checkCircle', avg(atts) + '%', 'Rata-rata kehadiran', 'success', `${students.length} pelajar`)}
       ${statCard('target', avg(tavg), 'Rata-rata nilai tugas', 'primary')}
-      ${statCard('trending', avg(tos), 'Rata-rata tryout terakhir', 'accent', `${toTrend[3] - toTrend[2] >= 0 ? '▲ +' : '▼ '}${toTrend[3] - toTrend[2]} dari TO sebelumnya`)}
+      ${statCard('trending', avg(tos), 'Rata-rata tryout terakhir', 'accent', `${trendMark(toTrend[3] - toTrend[2])} dari TO sebelumnya`)}
       ${statCard('alert', watch.length, 'Perlu perhatian', 'danger', 'Kehadiran <80% / nilai <72')}
     </div>
     <div class="cols cols-1-1">
@@ -964,7 +964,7 @@ PanitiaPages.laporan = {
         ${barChart(groups.filter(g => LapState.grp === 'all' || g.id === LapState.grp).map(g => ({ label: g.name, value: avg(Q.studentsOf(g.id).map(s => Q.attStats(s.id).pct)), color: g.color })), { max: 100, suffix: '%' })}
       </div>
       <div class="card"><div class="card-head"><h3>Tren rata-rata tryout eksternal</h3></div>
-        ${lineChart(toTrend.map((v, i) => ({ label: 'TO #' + (i + 1), value: v })), { min: 400, max: 700, color: '#ffb547', steps: 3, h: 210 })}
+        ${lineChart(toTrend.map((v, i) => ({ label: 'TO #' + (i + 1), value: v })), { min: 400, max: 700, color: '#a0336b', steps: 3, h: 210 })}
       </div>
     </div>
     <div class="card mt">

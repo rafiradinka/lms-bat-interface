@@ -47,6 +47,7 @@ const ICONS = {
   link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   slides: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
   target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  trendDown: '<polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/>',
   trending: '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
   lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   mail: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
@@ -62,11 +63,11 @@ const ICONS = {
 };
 const icon = (n, s = 18) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
 
-const LOGO = (s = 38) => `<svg width="${s}" height="${s}" viewBox="0 0 48 48" aria-label="Logo BAT">
-  <defs><linearGradient id="batlg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a596ff"/><stop offset="1" stop-color="#6b5af8"/></linearGradient></defs>
-  <rect width="48" height="48" rx="13" fill="url(#batlg)"/>
-  <path fill="#0d0f17" d="M24 34c-1.6-2.7-3.3-3.7-5-3.7-1.8 0-3 .9-3.8 2.1-1.3-1.9-3.8-3-7.2-2.5 2.6-2 4-4.8 3.9-8.3 2.8 1.4 6.2 1.4 9 .1l1.8-4.4 1.3 2.5h1.6l1.3-2.5 1.8 4.4c2.8 1.3 6.2 1.3 9-.1-.1 3.5 1.3 6.3 3.9 8.3-3.4-.5-5.9.6-7.2 2.5-.8-1.2-2-2.1-3.8-2.1-1.7 0-3.4 1-5 3.7z"/>
-  <circle cx="22.4" cy="21.6" r=".9" fill="#ffb547"/><circle cx="25.6" cy="21.6" r=".9" fill="#ffb547"/>
+/* Tanda sementara: bohlam putih di atas biru keabu-abuan. Ganti dengan berkas logo resmi BAT bila sudah tersedia. */
+const LOGO = (s = 38) => `<svg width="${s}" height="${s}" viewBox="0 0 48 48" role="img" aria-label="Logo BAT">
+  <rect width="48" height="48" rx="9" fill="#6485a3"/>
+  <path fill="#fff" d="M24 9.5a10.5 10.5 0 0 0-6.4 18.8c1.3 1 2.1 2.4 2.1 4v.9h8.6v-.9c0-1.6.8-3 2.1-4A10.5 10.5 0 0 0 24 9.5z"/>
+  <rect x="19.7" y="35.2" width="8.6" height="2.4" rx="1.2" fill="#fff"/><rect x="21.4" y="39" width="5.2" height="2.2" rx="1.1" fill="#fff"/>
 </svg>`;
 
 /* ---------- Util ---------- */
@@ -91,6 +92,14 @@ const hashStr = s => { let h = 2166136261; for (const ch of String(s)) { h ^= ch
 const initials = n => n.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 const firstName = n => n.split(' ')[0];
 const avatar = (name, cls = '') => `<span class="avatar ${cls}" style="--h:${hashStr(name) % 360}" title="${esc(name)}">${initials(name)}</span>`;
+/* Deret bulatan lembar jawaban: H · T · I · A, satu terisi sesuai status presensi */
+const ATT_LETTER = { hadir: 'H', terlambat: 'T', izin: 'I', alpa: 'A' };
+const attMark = status => {
+  const m = ATT[status];
+  return `<span class="att-mark ${m ? 'att-' + status : ''}"><span class="bub-row" aria-hidden="true">${Object.keys(ATT_LETTER).map(k => `<i class="${k === status ? 'on' : ''}">${ATT_LETTER[k]}</i>`).join('')}</span><b>${m ? m.label : 'Belum'}</b></span>`;
+};
+/* Penanda naik/turun dengan ikon garis, bukan glif */
+const trendMark = d => `<span class="trend">${icon(d >= 0 ? 'trending' : 'trendDown', 14)}${d >= 0 ? '+' : ''}${d}</span>`;
 const badge = (t, tone = 'neutral', cls = '') => `<span class="badge b-${tone} ${cls}">${t}</span>`;
 /* tag Kelompok Kelas (nama) dan tag Mata Pelajaran (kode) */
 const tag = g => g ? `<span class="tag" style="--c:${g.color}">${esc(g.name)}</span>` : '';
@@ -121,7 +130,7 @@ const TASK = {
   dinilai: { label: 'Dinilai', tone: 'success' },
 };
 const MAT_ICON = { PDF: 'file', PPT: 'slides', Video: 'video', Link: 'link' };
-const MAT_COLOR = { PDF: '#f87171', PPT: '#ffb547', Video: '#8b7bff', Link: '#60a5fa' };
+const MAT_COLOR = { PDF: '#b3321f', PPT: '#a85a0c', Video: '#5b4aa8', Link: '#1f5f99' };
 
 /* ---------- Query helper (akses data dummy) ---------- */
 const Q = {
@@ -409,10 +418,10 @@ function donut(segs, { size = 150, stroke = 16, label = '', sub = '' } = {}) {
   }).join('');
   return `<div class="donut" style="width:${size}px;height:${size}px"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform:rotate(-90deg)"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--surface-3)" stroke-width="${stroke}"/>${arcs}</svg><div class="donut-center"><b>${label}</b><span>${sub}</span></div></div>`;
 }
-const legend = segs => `<div class="legend">${segs.map(s => `<div style="--c:${s.color}"><i></i><span>${s.label}</span><b>${s.value}</b></div>`).join('')}</div>`;
+const legend = segs => `<div class="legend">${segs.map(s => `<div style="--c:${s.color}"><i>${s.letter || ''}</i><span>${s.label}</span><b>${s.value}</b></div>`).join('')}</div>`;
 
 let _chartId = 0;
-function lineChart(data, { min = 0, max = 100, color = '#8b7bff', h = 230, w = 640, steps = 4, suffix = '' } = {}) {
+function lineChart(data, { min = 0, max = 100, color = '#2f4d6a', h = 230, w = 640, steps = 4, suffix = '' } = {}) {
   const id = 'lg' + (++_chartId);
   const pad = { l: 40, r: 18, t: 18, b: 32 };
   const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
@@ -426,10 +435,10 @@ function lineChart(data, { min = 0, max = 100, color = '#8b7bff', h = 230, w = 6
   const pts = data.map((d, i) => [x(i), y(d.value)]);
   const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
   const area = `${line} L${pts[pts.length - 1][0]} ${pad.t + ih} L${pts[0][0]} ${pad.t + ih} Z`;
-  const dots = data.map((d, i) => `<circle class="pt" cx="${pts[i][0]}" cy="${pts[i][1]}" r="4.5" fill="#131722" stroke="${color}" stroke-width="2.5"><title>${d.label}: ${d.value}${suffix}</title></circle>`).join('');
-  const labels = data.map((d, i) => `<text x="${pts[i][0]}" y="${h - 8}" text-anchor="middle">${d.label}</text>`).join('');
-  const vals = data.map((d, i) => `<text x="${pts[i][0]}" y="${pts[i][1] - 12}" text-anchor="middle" style="fill:var(--text-2);font-weight:700">${d.value}</text>`).join('');
-  return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".32"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${grid}<path d="${area}" fill="url(#${id})"/><path d="${line}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>${dots}${vals}${labels}</svg>`;
+  const dots = data.map((d, i) => `<circle class="pt" cx="${pts[i][0]}" cy="${pts[i][1]}" r="4.5" fill="#ffffff" stroke="${color}" stroke-width="2.5"><title>${d.label}: ${d.value}${suffix}</title></circle>`).join('');
+  const labels = data.map((d, i) => `<text x="${pts[i][0]}" y="${h - 8}" text-anchor="${data.length > 1 && i === 0 ? 'start' : data.length > 1 && i === data.length - 1 ? 'end' : 'middle'}">${d.label}</text>`).join('');
+  const vals = data.map((d, i) => `<text x="${pts[i][0] + (i === 0 && data.length > 1 ? 4 : 0)}" y="${pts[i][1] - 12}" text-anchor="${data.length > 1 && i === 0 ? 'start' : data.length > 1 && i === data.length - 1 ? 'end' : 'middle'}" style="fill:var(--text-2);font-weight:700">${d.value}</text>`).join('');
+  return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".14"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${grid}<path d="${area}" fill="url(#${id})"/><path d="${line}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>${dots}${vals}${labels}</svg>`;
 }
 function barChart(data, { max, suffix = '' } = {}) {
   const m = max || Math.max(...data.map(d => d.value || 0), 1);
@@ -476,10 +485,10 @@ const annItem = a => {
 /* ---------- Ringkasan kehadiran (donut + legenda) ---------- */
 function attSummary(st, size = 150) {
   const segs = [
-    { label: 'Hadir', value: st.hadir, color: ATT.hadir.color },
-    { label: 'Terlambat', value: st.terlambat, color: ATT.terlambat.color },
-    { label: 'Izin', value: st.izin, color: ATT.izin.color },
-    { label: 'Tidak hadir', value: st.alpa, color: ATT.alpa.color },
+    { label: 'Hadir', letter: 'H', value: st.hadir, color: ATT.hadir.color },
+    { label: 'Terlambat', letter: 'T', value: st.terlambat, color: ATT.terlambat.color },
+    { label: 'Izin', letter: 'I', value: st.izin, color: ATT.izin.color },
+    { label: 'Tidak hadir', letter: 'A', value: st.alpa, color: ATT.alpa.color },
   ];
   return `<div class="donut-wrap">${donut(segs, { size, label: st.pct + '%', sub: 'kehadiran' })}${legend(segs)}</div>`;
 }
@@ -636,7 +645,7 @@ Shared.bindGroupActions = root => {
 };
 
 /* ---------- Form tambah/ubah Kelompok Kelas (Kurikulum & Administrator) ---------- */
-const GROUP_COLORS = ['#8b7bff', '#22d3ee', '#ffb547', '#f472b6', '#34d399', '#60a5fa', '#a3e635', '#fb923c'];
+const GROUP_COLORS = ['#3b4f9c', '#0f6f7d', '#a85a0c', '#a0336b', '#17734a', '#1f5f99', '#5f6d16', '#8a4a2b'];
 Shared.groupForm = id => {
   const g = id ? Q.grp(id) : null;
   // 1 Wali Kelas = 1 Kelompok Kelas: hanya wali yang belum mendampingi kelompok lain yang bisa dipilih

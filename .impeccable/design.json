@@ -1,0 +1,798 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-12T03:25:14.191Z",
+  "title": "Design System: LMS BAT",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "primary",
+        "displayName": "Slate Ink",
+        "canonical": "#2f4d6a",
+        "tonalRamp": [
+          "#0e1720",
+          "#182735",
+          "#21364a",
+          "#2a455f",
+          "#637a8f",
+          "#97a6b5",
+          "#cbd3da",
+          "#eaedf0"
+        ]
+      },
+      "ink-deep": {
+        "role": "primary",
+        "displayName": "Deep Slate Ink",
+        "canonical": "#233b53",
+        "tonalRamp": [
+          "#0b1219",
+          "#121e2a",
+          "#19293a",
+          "#20354b",
+          "#5a6c7e",
+          "#919da9",
+          "#c8ced4",
+          "#e9ebee"
+        ]
+      },
+      "graphite": {
+        "role": "secondary",
+        "displayName": "Graphite",
+        "canonical": "#1b242c",
+        "tonalRamp": [
+          "#080b0d",
+          "#0e1216",
+          "#13191f",
+          "#182028",
+          "#545b61",
+          "#8d9296",
+          "#c6c8ca",
+          "#e8e9ea"
+        ]
+      },
+      "primary-soft": {
+        "role": "primary",
+        "displayName": "Ink Wash",
+        "canonical": "#dce6ef",
+        "tonalRamp": [
+          "#424548",
+          "#6e7378",
+          "#9aa1a7",
+          "#c6cfd7",
+          "#e5ecf3",
+          "#eef3f7",
+          "#f6f9fb",
+          "#fcfdfd"
+        ]
+      },
+      "accent": {
+        "role": "tertiary",
+        "displayName": "Magenta Ink",
+        "canonical": "#a0336b",
+        "tonalRamp": [
+          "#300f20",
+          "#501a36",
+          "#70244b",
+          "#902e60",
+          "#b86690",
+          "#d099b5",
+          "#e7ccda",
+          "#f6ebf0"
+        ]
+      },
+      "accent-soft": {
+        "role": "tertiary",
+        "displayName": "Magenta Wash",
+        "canonical": "#f6dfea",
+        "tonalRamp": [
+          "#4a4346",
+          "#7b7075",
+          "#ac9ca4",
+          "#ddc9d3",
+          "#f8e7ef",
+          "#fbeff5",
+          "#fdf7fa",
+          "#fefcfd"
+        ]
+      },
+      "success": {
+        "role": "tertiary",
+        "displayName": "Hadir Green",
+        "canonical": "#17734a",
+        "tonalRamp": [
+          "#072316",
+          "#0c3a25",
+          "#105134",
+          "#156843",
+          "#519677",
+          "#8bb9a5",
+          "#c5dcd2",
+          "#e8f1ed"
+        ]
+      },
+      "success-soft": {
+        "role": "tertiary",
+        "displayName": "Hadir Wash",
+        "canonical": "#dbf0e4",
+        "tonalRamp": [
+          "#424844",
+          "#6e7872",
+          "#99a8a0",
+          "#c5d8cd",
+          "#e4f4eb",
+          "#edf8f2",
+          "#f6fbf8",
+          "#fbfefc"
+        ]
+      },
+      "warning": {
+        "role": "tertiary",
+        "displayName": "Terlambat Amber",
+        "canonical": "#8a5600",
+        "tonalRamp": [
+          "#291a00",
+          "#452b00",
+          "#613c00",
+          "#7c4d00",
+          "#a78040",
+          "#c5ab80",
+          "#e2d5bf",
+          "#f3eee6"
+        ]
+      },
+      "warning-soft": {
+        "role": "tertiary",
+        "displayName": "Terlambat Wash",
+        "canonical": "#fbecc8",
+        "tonalRamp": [
+          "#4b473c",
+          "#7e7664",
+          "#b0a58c",
+          "#e2d4b4",
+          "#fcf1d6",
+          "#fdf6e4",
+          "#fefaf1",
+          "#fffdfa"
+        ]
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "Tidak Hadir Red",
+        "canonical": "#b3321f",
+        "tonalRamp": [
+          "#360f09",
+          "#5a1910",
+          "#7d2316",
+          "#a12d1c",
+          "#c66557",
+          "#d9998f",
+          "#ecccc7",
+          "#f7ebe9"
+        ]
+      },
+      "danger-soft": {
+        "role": "tertiary",
+        "displayName": "Tidak Hadir Wash",
+        "canonical": "#fbe2dd",
+        "tonalRamp": [
+          "#4b4442",
+          "#7e716f",
+          "#b09e9b",
+          "#e2cbc7",
+          "#fce9e6",
+          "#fdf1ee",
+          "#fef8f7",
+          "#fffcfc"
+        ]
+      },
+      "info": {
+        "role": "tertiary",
+        "displayName": "Izin Blue",
+        "canonical": "#1f5f99",
+        "tonalRamp": [
+          "#091d2e",
+          "#10304d",
+          "#16436b",
+          "#1c568a",
+          "#5787b3",
+          "#8fafcc",
+          "#c7d7e6",
+          "#e9eff5"
+        ]
+      },
+      "info-soft": {
+        "role": "tertiary",
+        "displayName": "Izin Wash",
+        "canonical": "#dbe8f6",
+        "tonalRamp": [
+          "#42464a",
+          "#6e747b",
+          "#99a2ac",
+          "#c5d1dd",
+          "#e4eef8",
+          "#edf4fb",
+          "#f6f9fd",
+          "#fbfdfe"
+        ]
+      },
+      "bg": {
+        "role": "neutral",
+        "displayName": "Sheet Ground",
+        "canonical": "#e8edf1",
+        "tonalRamp": [
+          "#464748",
+          "#747779",
+          "#a2a6a9",
+          "#d1d5d9",
+          "#eef2f5",
+          "#f4f6f8",
+          "#f9fbfc",
+          "#fdfdfe"
+        ]
+      },
+      "bg-soft": {
+        "role": "neutral",
+        "displayName": "Soft Ground",
+        "canonical": "#f4f7f9",
+        "tonalRamp": [
+          "#494a4b",
+          "#7a7c7d",
+          "#abadae",
+          "#dcdee0",
+          "#f7f9fb",
+          "#fafbfc",
+          "#fcfdfe",
+          "#fefefe"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Field White",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#4d4d4d",
+          "#808080",
+          "#b3b3b3",
+          "#e6e6e6",
+          "#ffffff",
+          "#ffffff",
+          "#ffffff",
+          "#ffffff"
+        ]
+      },
+      "surface-2": {
+        "role": "neutral",
+        "displayName": "Header Band",
+        "canonical": "#f1f5f8",
+        "tonalRamp": [
+          "#484a4a",
+          "#797b7c",
+          "#a9acae",
+          "#d9dddf",
+          "#f5f8fa",
+          "#f8fafc",
+          "#fcfdfd",
+          "#fefefe"
+        ]
+      },
+      "surface-3": {
+        "role": "neutral",
+        "displayName": "Track Grey",
+        "canonical": "#dde5eb",
+        "tonalRamp": [
+          "#424547",
+          "#6f7376",
+          "#9ba0a5",
+          "#c7ced4",
+          "#e6ecf0",
+          "#eef2f5",
+          "#f7f9fa",
+          "#fcfcfd"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Ink Line",
+        "canonical": "#b7c4d0",
+        "tonalRamp": [
+          "#373b3e",
+          "#5c6268",
+          "#808992",
+          "#a5b0bb",
+          "#c9d3dc",
+          "#dbe2e8",
+          "#edf0f3",
+          "#f8f9fa"
+        ]
+      },
+      "border-soft": {
+        "role": "neutral",
+        "displayName": "Faint Line",
+        "canonical": "#d2dbe3",
+        "tonalRamp": [
+          "#3f4244",
+          "#696e72",
+          "#93999f",
+          "#bdc5cc",
+          "#dde4ea",
+          "#e9edf1",
+          "#f4f6f8",
+          "#fbfbfc"
+        ]
+      },
+      "border-strong": {
+        "role": "neutral",
+        "displayName": "Strong Line",
+        "canonical": "#7e93a7",
+        "tonalRamp": [
+          "#262c32",
+          "#3f4a54",
+          "#586775",
+          "#718496",
+          "#9eaebd",
+          "#bfc9d3",
+          "#dfe4e9",
+          "#f2f4f6"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Text",
+        "canonical": "#17222c",
+        "tonalRamp": [
+          "#070a0d",
+          "#0c1116",
+          "#10181f",
+          "#151f28",
+          "#515961",
+          "#8b9196",
+          "#c5c8ca",
+          "#e8e9ea"
+        ]
+      },
+      "text-2": {
+        "role": "neutral",
+        "displayName": "Secondary Text",
+        "canonical": "#36485a",
+        "tonalRamp": [
+          "#10161b",
+          "#1b242d",
+          "#26323f",
+          "#314151",
+          "#687683",
+          "#9ba4ad",
+          "#cdd1d6",
+          "#ebedef"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Text",
+        "canonical": "#586878",
+        "tonalRamp": [
+          "#1a1f24",
+          "#2c343c",
+          "#3e4954",
+          "#4f5e6c",
+          "#828e9a",
+          "#acb4bc",
+          "#d5d9dd",
+          "#eef0f2"
+        ]
+      },
+      "rail-muted": {
+        "role": "neutral",
+        "displayName": "Rail Muted",
+        "canonical": "#b9c8d6",
+        "tonalRamp": [
+          "#383c40",
+          "#5d646b",
+          "#828c96",
+          "#a7b4c1",
+          "#cbd6e0",
+          "#dce4eb",
+          "#eef1f5",
+          "#f8fafb"
+        ]
+      },
+      "focus-halo": {
+        "role": "neutral",
+        "displayName": "Focus Halo",
+        "canonical": "#c3d4e4",
+        "tonalRamp": [
+          "#3b4044",
+          "#626a72",
+          "#8994a0",
+          "#b0bfcd",
+          "#d2dfeb",
+          "#e1eaf2",
+          "#f0f4f8",
+          "#f9fbfc"
+        ]
+      },
+      "bubble-line": {
+        "role": "neutral",
+        "displayName": "Bubble Line",
+        "canonical": "#9aabba",
+        "tonalRamp": [
+          "#2e3338",
+          "#4d565d",
+          "#6c7882",
+          "#8b9aa7",
+          "#b3c0cb",
+          "#cdd5dd",
+          "#e6eaee",
+          "#f5f7f8"
+        ]
+      },
+      "ink-indigo": {
+        "role": "tertiary",
+        "displayName": "Indigo Printing Ink",
+        "canonical": "#3b4f9c",
+        "tonalRamp": [
+          "#12182f",
+          "#1e284e",
+          "#29376d",
+          "#35478c",
+          "#6c7bb5",
+          "#9da7ce",
+          "#ced3e6",
+          "#ebedf5"
+        ]
+      },
+      "ink-violet": {
+        "role": "tertiary",
+        "displayName": "Violet Printing Ink",
+        "canonical": "#5b4aa8",
+        "tonalRamp": [
+          "#1b1632",
+          "#2e2554",
+          "#403476",
+          "#524397",
+          "#8477be",
+          "#ada5d4",
+          "#d6d2e9",
+          "#efedf6"
+        ]
+      },
+      "ink-teal": {
+        "role": "tertiary",
+        "displayName": "Teal Printing Ink",
+        "canonical": "#0f6f7d",
+        "tonalRamp": [
+          "#052126",
+          "#08383f",
+          "#0b4e58",
+          "#0e6471",
+          "#4b939e",
+          "#87b7be",
+          "#c3dbdf",
+          "#e7f1f2"
+        ]
+      },
+      "ink-ochre": {
+        "role": "tertiary",
+        "displayName": "Ochre Printing Ink",
+        "canonical": "#a85a0c",
+        "tonalRamp": [
+          "#321b04",
+          "#542d06",
+          "#763f08",
+          "#97510b",
+          "#be8349",
+          "#d4ad86",
+          "#e9d6c2",
+          "#f6efe7"
+        ]
+      },
+      "ink-olive": {
+        "role": "tertiary",
+        "displayName": "Olive Printing Ink",
+        "canonical": "#5f6d16",
+        "tonalRamp": [
+          "#1d2107",
+          "#30370b",
+          "#434c0f",
+          "#566214",
+          "#879250",
+          "#afb68b",
+          "#d7dbc5",
+          "#eff0e8"
+        ]
+      },
+      "ink-brown": {
+        "role": "tertiary",
+        "displayName": "Brown Printing Ink",
+        "canonical": "#8a4a2b",
+        "tonalRamp": [
+          "#29160d",
+          "#452516",
+          "#61341e",
+          "#7c4327",
+          "#a77760",
+          "#c5a595",
+          "#e2d2ca",
+          "#f3edea"
+        ]
+      },
+      "logo-placeholder-blue": {
+        "role": "primary",
+        "displayName": "Placeholder Logo Blue",
+        "canonical": "#6485a3",
+        "tonalRamp": [
+          "#1e2831",
+          "#324352",
+          "#465d72",
+          "#5a7893",
+          "#8ba4ba",
+          "#b2c2d1",
+          "#d8e1e8",
+          "#f0f3f6"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Desktop login statement only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles, 24px rising to 29px at 768px; title blocks 23-30px."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card header-band titles in deep slate ink."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Running text; secondary lines 13-13.5px."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Stat labels, table headers, badges; sentence case."
+      },
+      "numeral": {
+        "displayName": "Numeral",
+        "purpose": "Stat values, scores, donut centre; tabular numerals."
+      }
+    },
+    "shadows": [
+      {
+        "name": "overlay",
+        "value": "0 16px 36px rgba(23, 34, 44, .16), 0 2px 6px rgba(23, 34, 44, .08)",
+        "purpose": "Drawer, notification panel, modals and toasts only."
+      },
+      {
+        "name": "focus-halo",
+        "value": "0 0 0 3px #c3d4e4",
+        "purpose": "Focused input, with a slate-ink border."
+      },
+      {
+        "name": "selected-ring",
+        "value": "inset 0 0 0 1px #1b242c",
+        "purpose": "Doubles the border of a selected option card."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(.16, 1, .3, 1)",
+        "purpose": "Panels, sheets, drawer, switch thumb, data fills."
+      },
+      {
+        "name": "state",
+        "value": "150ms",
+        "purpose": "Hover, border and background changes."
+      },
+      {
+        "name": "panel",
+        "value": "180-280ms",
+        "purpose": "Drawer, notification panel, modal, toast."
+      },
+      {
+        "name": "data-fill",
+        "value": "600-800ms",
+        "purpose": "Progress bars, bar charts, donut."
+      },
+      {
+        "name": "page-enter",
+        "value": "220ms, 4px rise",
+        "purpose": "Content column on route change."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.01ms",
+        "purpose": "All animations and transitions under prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "xs",
+        "value": "480px"
+      },
+      {
+        "name": "phone-wrap",
+        "value": "520px"
+      },
+      {
+        "name": "table-stack",
+        "value": "560px"
+      },
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "stats-4",
+        "value": "900px"
+      },
+      {
+        "name": "login-split",
+        "value": "980px"
+      },
+      {
+        "name": "rail",
+        "value": "1024px"
+      },
+      {
+        "name": "cols",
+        "value": "1100px"
+      },
+      {
+        "name": "cards-3",
+        "value": "1200px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one action of a view on the sheet: slate ink, white label.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Simpan</button>",
+      "css": ".ds-btn{font-family:var(--font,'Libre Franklin',system-ui,sans-serif);display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 16px;border-radius:5px;font-weight:700;font-size:14px;border:1px solid transparent;cursor:pointer;transition:transform .1s,background .15s,border-color .15s,color .15s}.ds-btn:active{transform:translateY(1px)}.ds-btn:focus-visible{outline:2px solid var(--ink,#2f4d6a);outline-offset:2px}.ds-btn-primary{background:var(--ink,#2f4d6a);color:#fff;border-color:var(--ink,#2f4d6a)}.ds-btn-primary:hover{background:var(--ink-deep,#233b53);border-color:var(--ink-deep,#233b53)}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action: white field with a strong ink line.",
+      "html": "<button class=\"ds-btn-ghost\">Batal</button>",
+      "css": ".ds-btn-ghost{font-family:var(--font,'Libre Franklin',system-ui,sans-serif);display:inline-flex;align-items:center;height:42px;padding:0 16px;border-radius:5px;font-weight:700;font-size:14px;background:var(--surface,#fff);color:var(--text,#17222c);border:1px solid var(--border-strong,#7e93a7);cursor:pointer;transition:background .15s,border-color .15s}.ds-btn-ghost:hover{background:var(--surface-2,#f1f5f8);border-color:var(--ink,#2f4d6a)}.ds-btn-ghost:focus-visible{outline:2px solid var(--ink,#2f4d6a);outline-offset:2px}"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Labelled field: strong line, 4px corners, ink border and halo on focus.",
+      "html": "<label class=\"ds-field\"><span>Nama Kelompok Kelas</span><input class=\"ds-input\" placeholder=\"cth. Saintek C\"></label>",
+      "css": ".ds-field{font-family:var(--font,'Libre Franklin',system-ui,sans-serif);display:flex;flex-direction:column;gap:6px;max-width:320px}.ds-field>span{font-size:13px;font-weight:700;color:var(--text,#17222c)}.ds-input{font:inherit;font-size:14.5px;height:44px;padding:0 12px;background:var(--surface,#fff);border:1px solid var(--border-strong,#7e93a7);border-radius:4px;outline:none;transition:border-color .15s,box-shadow .15s}.ds-input:hover{border-color:var(--ink,#2f4d6a)}.ds-input:focus{border-color:var(--ink,#2f4d6a);box-shadow:0 0 0 3px #c3d4e4}.ds-input::placeholder{color:#647484}"
+    },
+    {
+      "name": "Filter Chips",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Pill filters; the chosen one fills graphite.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip is-on\">Semua</button><button class=\"ds-chip\">Hadir</button><button class=\"ds-chip\">Izin</button></div>",
+      "css": ".ds-chips{display:flex;gap:8px}.ds-chip{font-family:var(--font,'Libre Franklin',system-ui,sans-serif);height:36px;padding:0 14px;border-radius:99px;border:1px solid var(--border-strong,#7e93a7);background:var(--surface,#fff);color:var(--text-2,#36485a);font-weight:600;font-size:13px;cursor:pointer;transition:border-color .15s,background .15s,color .15s}.ds-chip:hover{border-color:var(--graphite,#1b242c);color:var(--text,#17222c)}.ds-chip.is-on{background:var(--graphite,#1b242c);border-color:var(--graphite,#1b242c);color:#fff}.ds-chip:focus-visible{outline:2px solid var(--ink,#2f4d6a);outline-offset:2px}"
+    },
+    {
+      "name": "Field Card with Header Band",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "White bordered field whose head is a tinted band bleeding to the edge.",
+      "html": "<section class=\"ds-card\"><header class=\"ds-card-head\"><h3>Tugas belum dikumpulkan</h3><a href=\"#\">Materi dan Tugas</a></header><p>Latihan Integral Dasar · Tenggat Jum, 13 Nov</p></section>",
+      "css": ".ds-card{font-family:var(--font,'Libre Franklin',system-ui,sans-serif);background:var(--surface,#fff);border:1px solid var(--border,#b7c4d0);border-radius:6px;padding:18px;max-width:420px;color:var(--text,#17222c);font-size:14px}.ds-card-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:-18px -18px 16px;padding:11px 18px;background:var(--surface-2,#f1f5f8);border-bottom:1px solid var(--border-soft,#d2dbe3);border-radius:5px 5px 0 0}.ds-card-head h3{margin:0;font-size:14.5px;font-weight:800;color:var(--ink-deep,#233b53)}.ds-card-head a{font-size:13px;font-weight:700;color:var(--ink,#2f4d6a);text-decoration:none}.ds-card-head a:hover{text-decoration:underline}"
+    },
+    {
+      "name": "Rail Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Deep slate rail; active item is a white row with an edge timing mark.",
+      "html": "<nav class=\"ds-rail\"><a class=\"ds-nav is-on\" href=\"#\">Beranda</a><a class=\"ds-nav\" href=\"#\">Jadwal</a><a class=\"ds-nav\" href=\"#\">Presensi</a></nav>",
+      "css": ".ds-rail{font-family:var(--font,'Libre Franklin',system-ui,sans-serif);background:var(--ink-deep,#233b53);padding:14px;width:240px;display:flex;flex-direction:column;gap:2px}.ds-nav{position:relative;display:flex;align-items:center;height:42px;padding:0 12px;border-radius:4px;color:#dbe4ec;font-weight:600;font-size:14px;text-decoration:none;transition:background .15s,color .15s}.ds-nav:hover{background:rgba(255,255,255,.1);color:#fff}.ds-nav.is-on{background:#fff;color:var(--ink-deep,#233b53);font-weight:700}.ds-nav.is-on::before{content:'';position:absolute;left:-14px;top:50%;width:7px;height:20px;margin-top:-10px;background:#fff}.ds-nav:focus-visible{outline:2px solid #fff;outline-offset:2px}"
+    },
+    {
+      "name": "Attendance Bubble Row",
+      "kind": "custom",
+      "refersTo": "bubble",
+      "description": "Signature: H T I A bubbles, one filled in the state ink, followed by the written status.",
+      "html": "<span class=\"ds-att\"><span class=\"ds-bubs\"><i>H</i><i class=\"on\">T</i><i>I</i><i>A</i></span><b>Terlambat</b></span>",
+      "css": ".ds-att{font-family:var(--font,'Libre Franklin',system-ui,sans-serif);display:inline-flex;align-items:center;gap:7px;--mc:var(--warning,#8a5600)}.ds-bubs{display:inline-flex;gap:2px}.ds-bubs i{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:10.5px;font-weight:700;line-height:1;color:#586878;box-shadow:inset 0 0 0 1.5px #9aabba}.ds-bubs i.on{background:var(--mc);color:#fff;box-shadow:none}.ds-att>b{font-size:13px;font-weight:700;color:var(--mc)}"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge-success",
+      "description": "Soft tint, darker ink label, a filled dot for settled states and a hollow dot for pending.",
+      "html": "<span class=\"ds-badge ds-b-ok\">Disetujui</span> <span class=\"ds-badge ds-b-wait\">6 hari lagi</span>",
+      "css": ".ds-badge{font-family:var(--font,'Libre Franklin',system-ui,sans-serif);display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px 0 7px;border-radius:4px;font-size:12.5px;font-weight:700;white-space:nowrap}.ds-badge::before{content:'';width:9px;height:9px;border-radius:50%;background:currentColor}.ds-b-ok{background:var(--success-soft,#dbf0e4);color:#0f5a38}.ds-b-wait{background:var(--surface-3,#dde5eb);color:var(--text-2,#36485a)}.ds-b-wait::before{background:transparent;box-shadow:inset 0 0 0 1.5px currentColor}"
+    },
+    {
+      "name": "Ink Title Block",
+      "kind": "card",
+      "refersTo": "title-block",
+      "description": "Solid slate block for the next session, with reversed white actions.",
+      "html": "<section class=\"ds-hero\"><h2>Sesi Tambahan: Pembahasan Soal PK</h2><div class=\"ds-hero-act\"><button class=\"ds-hb-pri\">Masuk Kelas</button><button class=\"ds-hb-sec\">Tidak bisa hadir?</button></div></section>",
+      "css": ".ds-hero{font-family:var(--font,'Libre Franklin',system-ui,sans-serif);background:var(--ink,#2f4d6a);color:#fff;border-radius:6px;padding:20px;max-width:520px}.ds-hero h2{margin:0 0 16px;font-size:23px;font-weight:800;letter-spacing:-.01em}.ds-hero-act{display:flex;gap:10px;flex-wrap:wrap}.ds-hero-act button{font:inherit;height:42px;padding:0 16px;border-radius:5px;font-weight:700;font-size:14px;cursor:pointer;transition:background .15s,border-color .15s}.ds-hb-pri{background:#fff;color:var(--ink-deep,#233b53);border:1px solid #fff}.ds-hb-pri:hover{background:var(--primary-soft,#dce6ef);border-color:var(--primary-soft,#dce6ef)}.ds-hb-sec{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6)}.ds-hb-sec:hover{background:rgba(255,255,255,.14);border-color:#fff}.ds-hero button:focus-visible{outline:2px solid #fff;outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Lembar Jawaban",
+    "overview": "The interface reads like an LJK answer sheet, the form every UTBK student has filled in with a 2B pencil. The ground is pale blue-grey paper, the fields are white boxes drawn with 1px ink lines, and a status is one filled bubble in a row of empty ones. The shell rail and the title blocks are printed in solid slate ink with reversed white text. Anything the user has chosen is filled in graphite, the colour of the pencil.\n\nThe theme is light because of where it is used: students check in on phones in a daylit classroom, and panitia work on laptops in the same rooms. Density is moderate. Lists, tables and joined stat fields carry most screens, with one ink title block per view holding the next action. The brand is greyish blue with a white light-bulb mark; the bulb drawn in `js/core.js` is a labelled placeholder until the official logo file exists.\n\nSurfaces are flat solid fills. The shell, the title blocks and the stat fields carry no gradient and no glow.",
+    "keyCharacteristics": [
+      "Pale blue-grey ground, white bordered fields, tinted header bands on the fields.",
+      "Solid slate-ink rail and title blocks with white text and white primary buttons.",
+      "Graphite fill marks every selected state.",
+      "Square 4 to 6px corners on fields against fully round bubbles.",
+      "One typeface, Libre Franklin, heavy for headings, tabular for numbers.",
+      "Subject and group colours are deep printing inks that take white text."
+    ],
+    "rules": [
+      {
+        "name": "The Graphite Rule",
+        "body": "Selection is graphite. A chosen chip, tab, day, option or switch fills with `graphite` and turns its text white. Slate ink is for structure and actions, never for \"this one is selected\".",
+        "section": "colors"
+      },
+      {
+        "name": "The Reversed Ink Rule",
+        "body": "On a slate-ink block the roles flip: the primary button is white with deep-ink text, secondary buttons are transparent with a white 60% line, badges and tags sit on white, and the focus outline is white.",
+        "section": "colors"
+      },
+      {
+        "name": "The Printing Ink Rule",
+        "body": "A subject or group colour must be dark enough to carry white text at 12px bold. It fills tags, code badges and class covers as a solid; in list icons it appears as a 12% tint under its own colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "Every number that can be compared with another, in tables, stats, times, counts, scores and chart labels, uses tabular numerals.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "body": "Labels are written in sentence case at weight 700. The build has no uppercase tracked labels.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Sheet Rule",
+        "body": "A field at rest is outlined, never lifted. The overlay shadow appears only on layers that cover the page.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Bubble Rule",
+        "body": "A filled circle means the status is settled; a hollow circle means not yet. Bubbles are the only place a status colour appears as a solid fill, and a lettered bubble is always accompanied by its written label.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "**Do** show a status as a bubble plus its written label: lettered row for attendance, dot badge elsewhere.",
+      "**Do** fill selected controls with `graphite` and white text.",
+      "**Do** open a card with the tinted header band when it has a title.",
+      "**Do** put the single next action in a slate-ink title block, as a white button.",
+      "**Do** join related stat fields with shared 1px lines.",
+      "**Do** keep field corners at 4 to 6px and markers fully round.",
+      "**Do** use tabular numerals for every comparable number.",
+      "**Do** pick subject and group inks dark enough for white 12px bold text.",
+      "**Do** keep tap targets at 44px for icon buttons, inputs and option rows.",
+      "**Do** stack wide record tables into per-row blocks on phones instead of making them scroll sideways.",
+      "**Do** swap the placeholder bulb for the official logo file when it exists, and re-check the brand blue against it."
+    ],
+    "donts": [
+      "**Don't** lift a resting field with a blurred shadow; the overlay shadow is for drawers, panels, modals and toasts.",
+      "**Don't** put gradients or glows on the shell, title blocks or stat fields.",
+      "**Don't** use slate ink to mean \"selected\"; that is graphite's job.",
+      "**Don't** show a status by colour alone, without the label.",
+      "**Don't** fill a bubble that stands for something not yet decided.",
+      "**Don't** box a card inside a card with the same line weight; drop to the faint line or use dividers.",
+      "**Don't** switch to a dark theme; the light sheet was chosen for phones in a daylit classroom.",
+      "**Don't** add a second typeface for headings.",
+      "**Don't** treat the placeholder bulb or its blue as the official BAT identity."
+    ]
+  }
+}

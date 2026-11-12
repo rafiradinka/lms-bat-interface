@@ -48,14 +48,14 @@ const LoginPage = {
         <div class="hero-glow"></div><div class="hero-grid"></div>
         <div class="brand">${LOGO(46)}<div><b>LMS BAT</b><span>Bimbingan Alumni Tutoring</span></div></div>
         <div class="hero-copy">
-          <span class="eyebrow-pill">${icon('sparkle', 14)} Persiapan UTBK/SNBT · Yogyakarta</span>
-          <h1>Satu tempat untuk <span class="grad">belajar, hadir,</span> dan berkembang bersama.</h1>
+          <h1>Satu tempat untuk belajar, hadir, dan berkembang bersama.</h1>
           <p>Kelompok Kelas, jadwal sesi, materi, tugas, presensi berbasis lokasi, hingga perizinan, semuanya terintegrasi dalam satu aplikasi web komunitas BAT.</p>
+          <p class="hero-place">Persiapan UTBK/SNBT · Yogyakarta</p>
           <div class="value-chips"><span>Inklusif</span><span>Growth</span><span>Impact</span><span>Commitment</span></div>
         </div>
         <div class="hero-preview">
           <div class="pv-card"><small>Kehadiran</small><b>94%</b>${progress(94, 'var(--success)')}<p class="muted small" style="margin-top:8px">22 dari 24 sesi</p></div>
-          <div class="pv-card"><small>Izin</small><b style="font-size:16px;margin-top:8px">Disetujui ✓</b>
+          <div class="pv-card"><small>Izin</small><b class="pv-ok" style="font-size:16px;margin-top:8px">${icon('checkCircle', 18)} Disetujui</b>
             <div class="timeline" style="margin-top:6px"><div class="tl done"><span>Wali Kelas</span></div><div class="tl done"><span>Kurikulum</span></div></div></div>
         </div>
         <p class="hero-motto">“BAT?! Show The Way~”</p>
@@ -67,7 +67,7 @@ const LoginPage = {
           <div class="alert alert-danger hidden" id="login-error" role="alert">${icon('alert', 16)}<span></span></div>
           <label class="field" id="f-email"><span>Email</span><div class="input-ic">${icon('mail', 18)}<input type="email" id="email" placeholder="nama@bat.id" autocomplete="username"></div><small class="field-err"></small></label>
           <label class="field" id="f-pass"><span>Kata sandi</span><div class="input-ic">${icon('lock', 18)}<input type="password" id="password" placeholder="••••••••" autocomplete="current-password"><button type="button" class="pw-toggle" id="pw-toggle" aria-label="Tampilkan kata sandi">${icon('eye', 18)}</button></div><small class="field-err"></small></label>
-          <div class="row-between"><label class="check"><input type="checkbox" checked> Ingat saya</label><a href="#" id="forgot" style="color:var(--primary);font-weight:700;font-size:13px">Lupa kata sandi?</a></div>
+          <div class="row-between"><label class="check"><input type="checkbox" checked> Ingat saya</label><a href="#" id="forgot" style="color:var(--primary);font-weight:700;font-size:13.5px;text-decoration:underline">Lupa kata sandi?</a></div>
           <button class="btn btn-primary btn-lg btn-block" type="submit" id="login-btn">Masuk</button>
           <div class="demo-box">
             <p>Akun demo · kata sandi <code>bat123</code></p>

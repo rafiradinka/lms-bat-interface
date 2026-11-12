@@ -55,41 +55,41 @@ const DB = (() => {
 
   /* ---------- Mata Pelajaran ---------- */
   const subjects = [
-    { id: 'pu', code: 'PU', name: 'Penalaran Umum', color: '#34d399', active: true,
+    { id: 'pu', code: 'PU', name: 'Penalaran Umum', color: '#17734a', active: true,
       desc: 'Penalaran deduktif, induktif, dan kuantitatif untuk subtes TPS.',
       topics: ['Penalaran Deduktif', 'Penalaran Induktif', 'Silogisme', 'Pola Bilangan', 'Analisis Argumen', 'Pembahasan Soal PU'] },
-    { id: 'pk', code: 'PK', name: 'Pengetahuan Kuantitatif', color: '#8b7bff', active: true,
+    { id: 'pk', code: 'PK', name: 'Pengetahuan Kuantitatif', color: '#5b4aa8', active: true,
       desc: 'Aljabar, fungsi, limit, turunan, peluang, dan statistika dasar.',
       topics: ['Limit Fungsi', 'Turunan & Aplikasinya', 'Peluang & Kombinatorika', 'Barisan & Deret', 'Pembahasan Soal PK'] },
-    { id: 'pm', code: 'PM', name: 'Penalaran Matematika', color: '#60a5fa', active: true,
+    { id: 'pm', code: 'PM', name: 'Penalaran Matematika', color: '#1f5f99', active: true,
       desc: 'Penerapan konsep matematika pada masalah kontekstual sehari-hari.',
       topics: ['Integral Dasar', 'Statistika Data', 'Geometri Kontekstual', 'Pemodelan Matematika', 'Pembahasan Soal PM'] },
-    { id: 'lbi', code: 'LBI', name: 'Literasi Bahasa Indonesia', color: '#ffb547', active: true,
+    { id: 'lbi', code: 'LBI', name: 'Literasi Bahasa Indonesia', color: '#a85a0c', active: true,
       desc: 'Pemahaman bacaan, ide pokok, simpulan, dan evaluasi teks berbahasa Indonesia.',
       topics: ['Ide Pokok & Simpulan', 'Teks Argumentasi', 'Kohesi & Koherensi', 'Evaluasi Bacaan', 'Pembahasan Soal LBI'] },
-    { id: 'lbe', code: 'LBE', name: 'Literasi Bahasa Inggris', color: '#f472b6', active: true,
+    { id: 'lbe', code: 'LBE', name: 'Literasi Bahasa Inggris', color: '#a0336b', active: true,
       desc: 'Reading comprehension, vocabulary in context, dan inferensi teks berbahasa Inggris.',
       topics: ['Reading Comprehension', 'Vocabulary in Context', 'Main Idea & Inference', 'Pembahasan Soal LBE'] },
-    { id: 'pbm', code: 'PBM', name: 'Pemahaman Bacaan & Menulis', color: '#22d3ee', active: true,
+    { id: 'pbm', code: 'PBM', name: 'Pemahaman Bacaan & Menulis', color: '#0f6f7d', active: true,
       desc: 'Ejaan, tata kalimat, paragraf efektif, dan penyuntingan teks.',
       topics: ['Kalimat Efektif', 'Ejaan & Tanda Baca', 'Paragraf Argumentatif', 'Penyuntingan Teks'] },
-    { id: 'ppu', code: 'PPU', name: 'Pengetahuan & Pemahaman Umum', color: '#a3e635', active: true,
+    { id: 'ppu', code: 'PPU', name: 'Pengetahuan & Pemahaman Umum', color: '#5f6d16', active: true,
       desc: 'Wawasan umum, makna kata, dan hubungan antargagasan dalam teks.',
       topics: ['Makna Kata & Istilah', 'Hubungan Antarparagraf', 'Wawasan Sosial', 'Pembahasan Soal PPU'] },
-    { id: 'sbm', code: 'SBM', name: 'Strategi Belajar & Manajemen Waktu', color: '#fb923c', active: false,
+    { id: 'sbm', code: 'SBM', name: 'Strategi Belajar & Manajemen Waktu', color: '#8a4a2b', active: false,
       desc: 'Mapel pendukung tentang teknik belajar efektif dan manajemen waktu ujian. Sedang tidak dijadwalkan.',
       topics: ['Teknik Belajar Aktif', 'Manajemen Waktu Ujian'] },
   ];
 
   /* ---------- Kelompok Kelas ---------- */
   const groups = [
-    { id: 'g1', name: 'Saintek A', color: '#8b7bff', wali: 'Fajar Nugroho',
+    { id: 'g1', name: 'Saintek A', color: '#3b4f9c', wali: 'Fajar Nugroho',
       desc: 'Kelompok persiapan SNBT Saintek dengan fokus Pengetahuan Kuantitatif, Penalaran Matematika, dan Penalaran Umum.' },
-    { id: 'g2', name: 'Saintek B', color: '#22d3ee', wali: 'Putri Maharani',
+    { id: 'g2', name: 'Saintek B', color: '#0f6f7d', wali: 'Putri Maharani',
       desc: 'Kelompok paralel Saintek dengan tambahan Literasi Bahasa Inggris.' },
-    { id: 'g3', name: 'Soshum A', color: '#ffb547', wali: 'Wulan Sari',
+    { id: 'g3', name: 'Soshum A', color: '#a85a0c', wali: 'Wulan Sari',
       desc: 'Kelompok persiapan SNBT Soshum: literasi, pemahaman bacaan, dan pengetahuan umum.' },
-    { id: 'g4', name: 'Gap Year', color: '#f472b6', wali: 'Maya Anggraini',
+    { id: 'g4', name: 'Gap Year', color: '#a0336b', wali: 'Maya Anggraini',
       desc: 'Kelompok untuk alumni dan pejuang gap year dengan ritme intensif di pagi hari.' },
   ];
 
