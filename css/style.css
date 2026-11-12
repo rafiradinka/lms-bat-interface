@@ -164,9 +164,6 @@ code { background: var(--surface-3); padding: 1px 6px; border-radius: 3px; font-
 .side-user b { display: block; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-user-info span { display: block; font-size: 12px; color: #b9c8d6; }
 .side-user-info { min-width: 0; }
-.role-switch { margin-top: 10px; }
-.role-switch label { display: block; font-size: 12px; font-weight: 600; color: #b9c8d6; margin: 0 2px 6px; }
-.role-switch select { height: 38px; font-size: 13px; color: var(--text); border-color: transparent; }
 .side-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 18px; flex: 1; }
 .nav-label { font-size: 12px; font-weight: 600; color: #b9c8d6; padding: 0 12px 8px; }
 .nav-item {
@@ -1001,16 +998,7 @@ td:last-child, th:last-child { padding-right: 2px; }
 }
 
 /* ===== Tahun ajaran & arsip ===== */
-.year-switch { margin-top: 10px; }
-.year-switch label { display: block; font-size: 12px; font-weight: 600; color: #b9c8d6; margin: 0 2px 6px; }
-.year-switch select { height: 38px; font-size: 13px; font-weight: 700; color: var(--text); border-color: transparent; }
-.is-archive .year-switch select { box-shadow: inset 0 0 0 2px #e6cb85; }
 
-/* Penanda tahun di topbar: hanya muncul di layar lebar, kecuali saat arsip dibuka */
-.year-pill { display: none; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--border); font-size: 12.5px; font-weight: 700; color: var(--text-2); white-space: nowrap; }
-.year-pill.is-archive { display: inline-flex; background: var(--graphite); border-color: var(--graphite); color: #fff; }
-@media (min-width: 640px) { .year-pill { display: inline-flex; } }
-@media (max-width: 420px) { .year-pill.is-archive { padding: 0 9px; font-size: 12px; } }
 
 /* Pita arsip: lembar yang sudah dikumpulkan, tidak bisa diisi lagi */
 .archive-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 16px; background: var(--graphite); color: #fff; border-bottom: 3px solid #e6cb85; }
@@ -1059,5 +1047,34 @@ td:last-child, th:last-child { padding-right: 2px; }
 .roll-opt b { display: block; color: var(--text); }
 .roll-opt small { display: block; color: var(--muted); font-size: 12.5px; }
 .roll-carry { max-height: 180px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
-@media (max-width: 480px) { .year-pill .yp-word { display: none; } }
 .is-archive #content .switch input:disabled + span { opacity: .45; }
+
+/* Pengaturan: daftar bagian di kiri, isi bagian terpilih di kanan.
+   Ponsel: tab di atas, isi di tengah, Keluar paling bawah. */
+.set-layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "nav" "panel" "out"; }
+.set-nav { grid-area: nav; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; padding: 3px; background: var(--surface-3); border-radius: var(--radius); }
+.set-nav::-webkit-scrollbar { display: none; }
+.set-tab { display: flex; align-items: center; gap: 8px; flex: none; min-height: 40px; padding: 6px 14px; border-radius: 4px; color: var(--text-2); font-size: 13.5px; transition: background .15s, color .15s; }
+.set-tab b { display: block; font-weight: 600; line-height: 1.25; }
+.set-tab small { display: none; }
+.set-tab:not(.active):hover { color: var(--text); background: rgba(255, 255, 255, .5); }
+.set-tab.active { background: var(--graphite); color: #fff; }
+.set-tab.active b { font-weight: 700; }
+.set-panel { grid-area: panel; min-width: 0; }
+.set-out { grid-area: out; }
+@media (min-width: 900px) {
+  .set-layout { grid-template-columns: 270px minmax(0, 1fr); grid-template-rows: auto 1fr; grid-template-areas: "nav panel" "out panel"; align-items: start; }
+  .set-nav { grid-template-columns: 1fr; padding: 4px; background: var(--surface); border: 1px solid var(--border); }
+  .set-tab { padding: 10px 12px; gap: 10px; }
+  .set-tab > span { min-width: 0; }
+  .set-tab b { white-space: nowrap; }
+  .set-tab small { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .set-tab.active small { color: #c5d1dc; }
+  .set-tab:not(.active):hover { background: var(--surface-2); }
+}
+
+/* Penanda tahun ajaran di topbar: layar lebar selalu tampil; ponsel hanya saat arsip dibuka */
+.year-pill { display: none; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--border); font-size: 12.5px; font-weight: 700; color: var(--text-2); white-space: nowrap; }
+.year-pill.is-archive { display: inline-flex; background: var(--graphite); border-color: var(--graphite); color: #fff; }
+@media (min-width: 640px) { .year-pill { display: inline-flex; } }
+@media (max-width: 480px) { .year-pill .yp-word { display: none; } .year-pill.is-archive { padding: 0 9px; font-size: 12px; } }

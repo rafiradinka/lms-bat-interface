@@ -87,7 +87,6 @@ PanitiaPages.dashboard = {
       <div class="card">
         <div class="card-head"><h3>${icon('chart', 16)} Ringkasan kehadiran 7 hari terakhir</h3>${badge('Hadir + terlambat', 'neutral', 'no-dot')}</div>
         ${barChart(days7.map(d => ({ label: fmtDate(d.date, { weekday: 'short', day: 'numeric' }), title: `${fmtDay(d.date)} · ${d.present}/${d.expected} pelajar hadir dari ${d.sessions} sesi`, value: d.pct, color: d.pct == null ? null : d.pct < 70 ? 'var(--danger)' : 'var(--ink)' })), { max: 100, suffix: '%' })}
-        <p class="muted small" style="margin-top:10px">Per hari: total pelajar hadir di seluruh Kelompok Kelas &amp; mapel ÷ total pelajar yang seharusnya hadir hari itu. “—” = tidak ada sesi. Batang merah = kehadiran di bawah 70%.</p>
       </div>
       <div class="card">
         <div class="card-head"><h3>${icon('alert', 16)} Kehadiran terendah</h3>${badge('Global', 'neutral', 'no-dot')}</div>
@@ -1088,14 +1087,19 @@ PanitiaPages.pengguna = {
 /* ---------- Pengaturan ---------- */
 PanitiaPages.pengaturan = {
   title: 'Pengaturan',
-  render() {
+  render(tab) {
     const u = App.user;
     /* Pengaturan presensi: Tutor, Kurikulum, dan Administrator */
     const canSys = App.has('kurikulum', 'tutor');
-    return `
-    <div class="page-head"><div><h1>Pengaturan</h1></div></div>
-    <div class="cols cols-3-2">
-      <div>
+    const TABS = [
+      { id: 'profil', label: 'Profil akun', icon: 'user', sub: u.email },
+      { id: 'tahun', label: 'Tahun ajaran', icon: 'archive', sub: TA.isArchive ? `Melihat arsip ${DB.viewYear}` : `${TA.active.id} · aktif` },
+      { id: 'presensi', label: 'Pengaturan presensi', icon: 'locate', sub: 'Batas waktu, radius, titik lokasi' },
+      { id: 'notifikasi', label: 'Notifikasi', icon: 'bell', sub: 'Pemberitahuan di aplikasi' },
+    ];
+    const cur = TABS.find(t => t.id === tab) || TABS[0];
+    const panes = {
+      profil: () => `
         <div class="card">
           <div class="card-head"><h3>Profil akun</h3></div>
           <div class="row" style="gap:16px;margin-bottom:18px">${avatar(u.name, 'lg')}<div><b style="font-size:18px">${esc(u.name)}</b><p class="muted">${esc(u.email)}</p><div class="role-chips" style="margin-top:8px">${roleBadges(u)}</div></div></div>
@@ -1103,22 +1107,13 @@ PanitiaPages.pengaturan = {
             <label class="field"><span>Nama lengkap</span><input id="st-name" value="${esc(u.name)}"></label>
             <label class="field"><span>Email</span><input value="${esc(u.email)}" disabled></label>
           </div>
-          <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn btn-ghost" data-pw>${icon('lock', 16)} Ubah kata sandi</button><button class="btn btn-primary" data-save-profile>Simpan profil</button></div>
-        </div>
-        <div class="card mt">
-          <div class="card-head"><h3>${icon('bell', 16)} Notifikasi</h3></div>
-          <p class="muted small" style="margin-bottom:8px">Notifikasi hanya tampil di dalam aplikasi (ikon lonceng). Belum ada pengiriman keluar web.</p>
-          ${[['Pengajuan izin baru', true], ['Pengumpulan tugas', true], ['Koreksi presensi', true], ['Ringkasan harian', false]].map(([t, on]) => `<div class="setting-row"><div><b>${t}</b></div><label class="switch"><input type="checkbox" ${on ? 'checked' : ''} data-toggle><span></span></label></div>`).join('')}
-        </div>
-        <div class="card mt">
-          <div class="setting-row"><div><b>Keluar dari akun</b><small>Akhiri sesi di perangkat ini</small></div><button class="btn btn-sm btn-danger" data-action="logout">${icon('logout', 14)} Keluar</button></div>
-        </div>
-      </div>
-      <div>
-        ${yearCard()}
-        <div class="card mt">
+          <div class="row wrap" style="margin-top:14px;justify-content:flex-end;gap:8px"><button class="btn btn-ghost" data-pw>${icon('lock', 16)} Ubah kata sandi</button><button class="btn btn-primary" data-save-profile>Simpan profil</button></div>
+        </div>`,
+      tahun: () => yearCard(),
+      presensi: () => `
+        <div class="card">
           <div class="card-head"><h3>${icon('locate', 16)} Pengaturan presensi</h3>${canSys ? '' : badge('Hanya Tutor, Kurikulum, Admin', 'neutral', 'no-dot')}</div>
-          <div class="form-grid">
+          <div class="form-grid two">
             <label class="field"><span>Batas Hadir sejak presensi dibuka (menit)</span><input type="number" id="st-late" value="${DB.settings.lateTolerance}" min="0" max="60" ${canSys ? '' : 'disabled'}></label>
             <label class="field"><span>Radius area presensi (meter)</span><input type="number" id="st-radius" value="${DB.settings.geoRadius}" min="20" max="1000" ${canSys ? '' : 'disabled'}><small class="muted small">Pelajar harus berada dalam radius ini dari titik lokasi tempat sesi.</small></label>
             <label class="field"><span>Batas pengajuan izin</span><select id="st-izin" ${canSys ? '' : 'disabled'}>${['H-0', 'H-1', 'H-2'].map(v => `<option ${DB.settings.leaveDeadline === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
@@ -1135,7 +1130,23 @@ PanitiaPages.pengaturan = {
             ${canSys ? `<div class="row wrap" style="gap:8px;margin-top:8px"><button class="btn btn-sm btn-ghost" data-add-place>${icon('plus', 14)} Tambah titik</button><button class="btn btn-sm btn-ghost" data-here>${icon('locate', 14)} Isi titik terakhir dengan lokasi saya</button></div>` : ''}
           </div>
           ${canSys ? `<button class="btn btn-primary btn-block mt" data-save-sys>Simpan pengaturan</button>` : ''}
-        </div>
+        </div>`,
+      notifikasi: () => `
+        <div class="card">
+          <div class="card-head"><h3>${icon('bell', 16)} Notifikasi</h3></div>
+          <p class="muted small" style="margin-bottom:8px">Notifikasi hanya tampil di dalam aplikasi (ikon lonceng). Belum ada pengiriman keluar web.</p>
+          ${[['Pengajuan izin baru', true], ['Pengumpulan tugas', true], ['Koreksi presensi', true], ['Ringkasan harian', false]].map(([t, on]) => `<div class="setting-row"><div><b>${t}</b></div><label class="switch"><input type="checkbox" ${on ? 'checked' : ''} data-toggle><span></span></label></div>`).join('')}
+        </div>`,
+    };
+    return `
+    <div class="page-head"><div><h1>Pengaturan</h1></div></div>
+    <div class="set-layout">
+      <nav class="set-nav" aria-label="Bagian pengaturan">
+        ${TABS.map(t => `<a class="set-tab ${t.id === cur.id ? 'active' : ''}" href="#/pengaturan/${t.id}" ${t.id === cur.id ? 'aria-current="page"' : ''}>${icon(t.icon, 18)}<span><b>${t.label}</b><small>${esc(t.sub)}</small></span></a>`).join('')}
+      </nav>
+      <section class="set-panel">${panes[cur.id]()}</section>
+      <div class="card set-out">
+        <div class="setting-row"><div><b>Keluar dari akun</b><small>Akhiri sesi di perangkat ini</small></div><button class="btn btn-sm btn-danger" data-action="logout">${icon('logout', 14)} Keluar</button></div>
       </div>
     </div>`;
   },

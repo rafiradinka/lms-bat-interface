@@ -102,8 +102,6 @@ document.addEventListener('submit', e => {
 }, true);
 
 /* ---------- Komponen ---------- */
-const yearSwitch = () => `<div class="year-switch"><label for="year-switch">Tahun ajaran</label><select id="year-switch">${TA.sorted().map(y =>
-  `<option value="${y.id}" ${y.id === DB.viewYear ? 'selected' : ''}>${y.id} · ${y.status === 'aktif' ? 'aktif' : 'arsip'}</option>`).join('')}</select></div>`;
 
 const archiveBar = () => {
   const y = TA.viewing;
@@ -190,13 +188,7 @@ function openRolloverModal() {
   });
 }
 
-/* Tombol tahun ajaran di mana pun (sidebar, banner arsip, kartu pengaturan) */
-document.addEventListener('change', e => {
-  if (e.target.id !== 'year-switch') return;
-  TA.view(e.target.value);
-  buildShell(); render();
-  toast(TA.isArchive ? `Membuka arsip ${DB.viewYear} (hanya baca).` : `Kembali ke tahun ajaran aktif ${DB.viewYear}.`, 'info');
-});
+/* Tombol tahun ajaran (banner arsip & tab Tahun ajaran di Pengaturan) */
 document.addEventListener('click', e => {
   const v = e.target.closest('[data-year-view]'), back = e.target.closest('[data-year-back]'), nw = e.target.closest('[data-year-new]');
   if (nw && !TA.isArchive) return openRolloverModal();

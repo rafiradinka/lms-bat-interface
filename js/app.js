@@ -163,8 +163,6 @@ function buildShell() {
     <aside class="sidebar" id="sidebar" aria-label="Navigasi utama">
       <div class="side-brand">${LOGO(38)}<div><b>LMS BAT</b><span>Bimbingan Alumni Tutoring</span></div><button class="icon-btn side-close" data-action="close-sidebar" aria-label="Tutup menu">${icon('x')}</button></div>
       <div class="side-user">${avatar(u.name)}<div class="side-user-info"><b>${esc(u.name)}</b><span>${esc(roleText)}</span></div></div>
-      ${App.isPanitia ? yearSwitch() : ''}
-      ${App.isPanitia ? `<div class="role-switch"><label for="role-switch">Demo · ganti akun panitia</label><select id="role-switch">${DB.accounts.filter(a => a.type === 'panitia').map(a => `<option value="${a.email}" ${a.email === u.email ? 'selected' : ''}>${a.label} — ${firstName(a.name)}</option>`).join('')}</select></div>` : ''}
       <nav class="side-nav">
         <p class="nav-label">${App.isPanitia ? 'Menu Panitia' : 'Menu Pelajar'}</p>
         ${items.map(n => { const cnt = n.count ? n.count() : 0; return `<a class="nav-item" href="#/${n.id}" data-nav="${n.id}">${icon(n.icon)}<span>${n.label}</span>${n.tag ? `<span class="nav-tag">${n.tag}</span>` : cnt ? `<span class="nav-count">${cnt}</span>` : ''}</a>${n.sub ? `<div class="nav-subs">${n.sub.map(s => `<a class="nav-sub" href="#/${s.path}" data-sub="${s.path}" data-parent="${n.id}">${s.label}</a>`).join('')}</div>` : ''}`; }).join('')}
@@ -189,8 +187,6 @@ function buildShell() {
     </div>
     <nav class="bottom-nav" aria-label="Navigasi bawah">${bottom}<button class="bn-item" data-action="open-sidebar">${icon('more', 22)}<span>Menu</span></button></nav>
   </div>`;
-  const rs = $('#role-switch');
-  if (rs) rs.addEventListener('change', () => { const acc = DB.accounts.find(a => a.email === rs.value); App.user = JSON.parse(JSON.stringify(acc)); sessionStorage.setItem('bat_user', acc.email); buildShell(); location.hash = '#/dashboard'; render(); toast(`Beralih ke ${acc.label} (${firstName(acc.name)}).`, 'info'); });
 }
 
 const notifList = () => DB.notifications[App.isPanitia ? 'panitia' : 'pelajar'];
