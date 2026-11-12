@@ -120,7 +120,7 @@ const LoginPage = {
         const st = acc.studentId && Q.student(acc.studentId);
         if (acc.studentId && (!st || !Q.isActive(st))) {
           btn.classList.remove('loading'); btn.textContent = 'Masuk';
-          showAlert('Akun pelajar ini sedang dinonaktifkan. Hubungi Kurikulum BAT.');
+          showAlert(st ? 'Akun pelajar ini sedang dinonaktifkan. Hubungi Kurikulum BAT.' : `Akun ini tidak terdaftar di tahun ajaran ${TA.active.id}. Hubungi Kurikulum BAT untuk pendaftaran ulang.`);
           return;
         }
         login(acc);
@@ -139,6 +139,7 @@ function login(acc) {
 }
 function logout() {
   Cleanup.run();
+  if (TA.isArchive) TA.backToActive();
   App.user = null;
   sessionStorage.removeItem('bat_user');
   history.replaceState(null, '', location.pathname);
@@ -162,6 +163,7 @@ function buildShell() {
     <aside class="sidebar" id="sidebar" aria-label="Navigasi utama">
       <div class="side-brand">${LOGO(38)}<div><b>LMS BAT</b><span>Bimbingan Alumni Tutoring</span></div><button class="icon-btn side-close" data-action="close-sidebar" aria-label="Tutup menu">${icon('x')}</button></div>
       <div class="side-user">${avatar(u.name)}<div class="side-user-info"><b>${esc(u.name)}</b><span>${esc(roleText)}</span></div></div>
+      ${App.isPanitia ? yearSwitch() : ''}
       ${App.isPanitia ? `<div class="role-switch"><label for="role-switch">Demo · ganti akun panitia</label><select id="role-switch">${DB.accounts.filter(a => a.type === 'panitia').map(a => `<option value="${a.email}" ${a.email === u.email ? 'selected' : ''}>${a.label} — ${firstName(a.name)}</option>`).join('')}</select></div>` : ''}
       <nav class="side-nav">
         <p class="nav-label">${App.isPanitia ? 'Menu Panitia' : 'Menu Pelajar'}</p>
@@ -175,12 +177,14 @@ function buildShell() {
         <button class="icon-btn menu-btn" data-action="open-sidebar" aria-label="Buka menu">${icon('menu')}</button>
         <div class="topbar-title"><h2 id="page-title">LMS BAT</h2><span id="page-crumb">${App.isPanitia ? 'Panitia' : 'Pelajar'}</span></div>
         <div class="topbar-actions">
+          ${App.isPanitia ? `<span class="year-pill ${TA.isArchive ? 'is-archive' : ''}">${icon(TA.isArchive ? 'archive' : 'calendar', 14)} <span class="yp-word">${TA.isArchive ? 'Arsip' : 'TA'}</span> ${esc(DB.viewYear)}</span>` : ''}
           <span class="role-pill">${icon(App.isPanitia ? 'shield' : 'user', 14)} ${esc(App.isPanitia ? u.label : 'Pelajar')}</span>
           <button class="icon-btn notif-btn" data-action="notif" aria-label="Notifikasi">${icon('bell')}<i class="dot ${unreadCount() ? '' : 'hidden'}"></i></button>
           <a class="top-avatar" href="#/${App.isPanitia ? 'pengaturan' : 'profil'}" aria-label="Profil">${avatar(u.name, 'sm')}</a>
         </div>
         <div class="notif-panel" id="notif-panel"></div>
       </header>
+      <div id="archive-slot"></div>
       <main class="content" id="content"></main>
     </div>
     <nav class="bottom-nav" aria-label="Navigasi bawah">${bottom}<button class="bn-item" data-action="open-sidebar">${icon('more', 22)}<span>Menu</span></button></nav>
@@ -210,7 +214,7 @@ function render(keepScroll) {
   Cleanup.run();
   closeModal(true);
   if (!App.user) { $('#app').innerHTML = LoginPage.render(); LoginPage.mount(); document.title = 'Masuk · LMS BAT'; return; }
-  processLeaveExpiry();   // izin yang tidak ditindak sampai sesi selesai → kedaluwarsa (Tidak hadir)
+  if (!TA.isArchive) processLeaveExpiry();   // izin yang tidak ditindak sampai sesi selesai → kedaluwarsa (Tidak hadir)
   if (!$('.shell')) buildShell();
   const hash = location.hash.replace(/^#\/?/, '');
   const [page, ...params] = (hash || defaultRoute()).split('/');
@@ -228,6 +232,9 @@ function render(keepScroll) {
   $('#page-title').textContent = title;
   document.title = `${title} · LMS BAT`;
   if (p.mount) p.mount(fresh, ...params);
+  lockArchive(fresh);   // arsip: kolom isian dikunci
+  $('.shell').classList.toggle('is-archive', TA.isArchive);
+  $('#archive-slot').innerHTML = TA.isArchive ? archiveBar() : '';
   const navPage = p.navAs || page;
   $$('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === navPage));
   const navDef = navItems().find(n => n.id === navPage);

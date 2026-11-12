@@ -987,3 +987,77 @@ td:last-child, th:last-child { padding-right: 2px; }
   .att-table .att-mark { gap: 6px; }
 }
 .att-table { min-width: 0; }
+
+/* Aksi baris tabel: tombol sejajar, ukuran sama */
+.row-actions { white-space: nowrap; text-align: right; }
+.row-actions .btn { min-width: 86px; }
+.row-actions .btn + .btn { margin-left: 6px; }
+
+/* Ponsel: daftar ringkas (judul + jumlah sesi) tetap satu baris */
+@media (max-width: 520px) {
+  .item:not(:has(.item-sub)) { flex-wrap: nowrap; align-items: center; }
+  .item:not(:has(.item-sub)) > .item-body { flex: 0 1 auto; }
+  .item:not(:has(.item-sub)) > .badge { margin-left: 0; }
+}
+
+/* ===== Tahun ajaran & arsip ===== */
+.year-switch { margin-top: 10px; }
+.year-switch label { display: block; font-size: 12px; font-weight: 600; color: #b9c8d6; margin: 0 2px 6px; }
+.year-switch select { height: 38px; font-size: 13px; font-weight: 700; color: var(--text); border-color: transparent; }
+.is-archive .year-switch select { box-shadow: inset 0 0 0 2px #e6cb85; }
+
+/* Penanda tahun di topbar: hanya muncul di layar lebar, kecuali saat arsip dibuka */
+.year-pill { display: none; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--border); font-size: 12.5px; font-weight: 700; color: var(--text-2); white-space: nowrap; }
+.year-pill.is-archive { display: inline-flex; background: var(--graphite); border-color: var(--graphite); color: #fff; }
+@media (min-width: 640px) { .year-pill { display: inline-flex; } }
+@media (max-width: 420px) { .year-pill.is-archive { padding: 0 9px; font-size: 12px; } }
+
+/* Pita arsip: lembar yang sudah dikumpulkan, tidak bisa diisi lagi */
+.archive-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 16px; background: var(--graphite); color: #fff; border-bottom: 3px solid #e6cb85; }
+.archive-bar > .ic { flex: none; color: #e6cb85; }
+.archive-bar > div { flex: 1 1 260px; min-width: 0; }
+.archive-bar b { display: block; font-size: 14px; }
+.archive-bar span { display: block; font-size: 12.5px; color: #c9d4de; }
+.archive-bar .btn { background: #fff; color: var(--graphite); border-color: #fff; }
+.archive-bar .btn:hover { background: #e8edf1; }
+@media (min-width: 768px) { .archive-bar { padding: 10px 28px; } }
+
+/* Mode arsip: aksi yang mengubah data disembunyikan */
+.is-archive #content :is([data-act], [data-edit], [data-add], [data-new-subj], [data-edit-subj], [data-new-mat], [data-new-task],
+  [data-kok], [data-kno], [data-wali-ok], [data-wali-no], [data-ok], [data-no], [data-to], [data-new-user], [data-edit-user],
+  [data-pw], [data-save-profile], [data-add-place], [data-here], [data-save-sys], [data-ann], [data-r], [data-manual],
+  [data-edit-att], [data-correct], [data-do]) { display: none !important; }
+.is-archive #content :is(input, select, textarea):disabled { background: var(--surface-2); color: var(--text-2); }
+.ro-note { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+
+/* Kartu tahun ajaran (Pengaturan) */
+.year-list { display: flex; flex-direction: column; }
+.year-row { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "id act" "meta act"; column-gap: 12px; row-gap: 2px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-soft); }
+.year-row:last-child { border-bottom: none; }
+.year-id { grid-area: id; display: flex; align-items: center; gap: 8px; }
+.year-id b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.year-row > small { grid-area: meta; font-size: 12.5px; color: var(--muted); }
+.year-act { grid-area: act; }
+.year-row.is-here { box-shadow: inset 3px 0 0 var(--graphite); padding-left: 12px; }
+
+/* Modal pergantian tahun ajaran */
+.roll-grid { display: grid; gap: 20px; }
+@media (min-width: 720px) { .roll-grid { grid-template-columns: 1fr 1fr; } }
+.roll-h { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.roll-h + .muted { margin-bottom: 0; }
+.roll-counts { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; }
+.roll-counts div { padding: 10px 12px; border-right: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); }
+.roll-counts div:nth-child(3n) { border-right: none; }
+.roll-counts div:nth-last-child(-n+3) { border-bottom: none; }
+.roll-counts b { display: block; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.roll-counts span { font-size: 12px; color: var(--muted); }
+.roll-pend { margin: 4px 0 0; padding-left: 18px; font-weight: 500; }
+.roll-pend li + li { margin-top: 2px; }
+.roll-col > .field + .roll-opt { margin-top: 14px; }
+.roll-opt { align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--border-soft); width: 100%; }
+.roll-opt input { margin-top: 2px; flex: none; }
+.roll-opt b { display: block; color: var(--text); }
+.roll-opt small { display: block; color: var(--muted); font-size: 12.5px; }
+.roll-carry { max-height: 180px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
+@media (max-width: 480px) { .year-pill .yp-word { display: none; } }
+.is-archive #content .switch input:disabled + span { opacity: .45; }

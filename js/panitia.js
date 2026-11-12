@@ -56,7 +56,6 @@ PanitiaPages.dashboard = {
         <div class="role-chips" style="margin-top:8px">${roleBadges(u)}</div></div>
       ${App.has('kurikulum', 'tutor', 'wali') ? `<div class="actions"><button class="btn btn-ghost" data-ann>${icon('megaphone', 16)} Pengumuman</button></div>` : ''}
     </div>
-    ${App.isAdmin ? `<div class="alert alert-primary" style="margin-bottom:16px">${icon('key', 16)}<span>Masuk sebagai <b>Administrator</b>: akses penuh ke seluruh modul, termasuk penempatan pelajar, tutor, Wali Kelas, serta menu <a href="#/pengguna" style="text-decoration:underline">Pengguna & Peran</a>.</span></div>` : ''}
     <div class="stats">
       ${statCard('users', students.length, Q.seeAll() ? 'Pelajar aktif' : 'Pelajar aktif di kelompokku', 'primary')}
       ${statCard('layers', groups.length, 'Kelompok Kelas', 'info', `${todays.length} sesi hari ini`)}
@@ -130,10 +129,9 @@ PanitiaPages.pelajar = {
     const cnt = k => all.filter(s => k === 'all' || (k === 'on' ? Q.isActive(s) : !Q.isActive(s))).length;
     return `
     <div class="page-head">
-      <div><h1>Manajemen Pelajar</h1><p>${scope}. Setiap pelajar terdaftar di tepat satu Kelompok Kelas.</p></div>
+      <div><h1>Manajemen Pelajar</h1></div>
       <div class="actions"><button class="btn btn-ghost" data-export>${icon('download', 16)} Ekspor</button>${canPlace ? `<button class="btn btn-primary" data-add>${icon('plus', 16)} Tambah pelajar</button>` : ''}</div>
     </div>
-    ${!canPlace ? `<div class="alert alert-primary" style="margin-bottom:16px">${icon('shield', 16)}<span>Penempatan pelajar ke Kelompok Kelas hanya dapat diubah oleh Kurikulum atau Administrator.</span></div>` : ''}
     <div class="stats">
       ${statCard('users', active.length, 'Pelajar aktif', 'primary', off ? `${off} nonaktif` : '')}
       ${statCard('book', active.filter(s => s.status === 'Kelas 12').length, 'Kelas 12', 'info')}
@@ -161,7 +159,7 @@ PanitiaPages.pelajar = {
         <td>${esc(s.school)}<div class="muted small">${s.status}</div></td>
         <td>${progRow(pct, toneByPct(pct))}</td>
         <td><b>${Q.taskAvg(s.id)}</b></td>
-        <td style="text-align:right;white-space:nowrap"><button class="btn btn-sm btn-ghost" data-detail="${s.id}">Detail</button>${canPlace ? ` <button class="btn btn-sm btn-ghost" data-edit="${s.id}" aria-label="Ubah ${esc(s.name)}">${icon('edit', 14)} Ubah</button>${on ? ` <button class="icon-btn" data-move="${s.id}" title="Pindahkan kelompok" aria-label="Pindahkan ${esc(s.name)}">${icon('swap', 16)}</button>` : ''}` : ''}</td></tr>`;
+        <td class="row-actions"><button class="btn btn-sm btn-ghost" data-detail="${s.id}">${icon('eye', 14)} Detail</button>${canPlace ? `<button class="btn btn-sm btn-ghost" data-edit="${s.id}" aria-label="Ubah ${esc(s.name)}">${icon('edit', 14)} Ubah</button>` : ''}</td></tr>`;
     }).join('');
   },
   mount(root) {
@@ -259,7 +257,7 @@ PanitiaPages.pelajar = {
 function studentDetailModal(id) {
   const s = Q.student(id), g = Q.grp(s.groupId);
   const st = Q.attStats(s.id);
-  const hist = s.id === 'p1' ? DB.tryouts.map(Q.toAvg) : s.toHist;
+  const hist = s.id === 'p1' && DB.tryouts.length ? DB.tryouts.map(Q.toAvg) : s.toHist;
   const leaves = DB.leaves.filter(l => l.studentId === s.id);
   openModal({
     title: s.name, sub: `${s.school} · ${s.status}`, size: 'lg',
@@ -342,15 +340,8 @@ const KelompokPage = {
     const walis = Q.walis();
     return `
     <div class="page-head">
-      <div><h1>Kelompok Kelas</h1><p>${Q.seeAll() ? 'Seluruh Kelompok Kelas BAT beserta Wali Kelas, mata pelajaran, dan jadwalnya.' : 'Kelompok Kelas yang kamu ajar atau dampingi.'}</p></div>
+      <div><h1>Kelompok Kelas</h1></div>
       ${canPlace ? `<div class="actions"><button class="btn btn-primary" data-act="new-group">${icon('plus', 16)} Tambah Kelompok Kelas</button></div>` : ''}
-    </div>
-    <div class="rule-strip">
-      <span>${icon('users', 14)} 1 pelajar = 1 Kelompok Kelas</span>
-      <span>${icon('user', 14)} 1 kelompok = 1 Wali Kelas</span>
-      <span>${icon('layers', 14)} 1 Wali Kelas = 1 kelompok</span>
-      <span>${icon('shield', 14)} Tutor tidak merangkap Wali Kelas</span>
-      <span>${icon('book', 14)} Tutor pengampu diatur per Mata Pelajaran</span>
     </div>
     <div class="stats">
       ${statCard('layers', groups.length, 'Kelompok Kelas', 'primary')}
@@ -387,7 +378,7 @@ const MapelPage = {
     const cnt = k => DB.subjects.filter(s => k === 'all' || (k === 'on' ? s.active : !s.active)).length;
     return `
     <div class="page-head">
-      <div><h1>Mata Pelajaran</h1><p>Daftar mata pelajaran BAT. Materi dan tugas dikelompokkan berdasarkan mata pelajaran; mapel nonaktif tidak dapat dipilih untuk sesi atau tugas baru.</p></div>
+      <div><h1>Mata Pelajaran</h1></div>
       ${canPlace ? `<div class="actions"><button class="btn btn-primary" data-new-subj>${icon('plus', 16)} Tambah mapel</button></div>` : ''}
     </div>
     <div class="card">
@@ -523,7 +514,7 @@ PanitiaPages.materi = {
     const mats = DB.materials.filter(m => subs.some(s => s.id === m.subjectId));
     return `
     <div class="page-head">
-      <div><h1>Materi dan Tugas</h1><p>Dikelompokkan per Mata Pelajaran. Materi melekat pada mapel dan terbuka untuk semua Kelompok Kelas yang mempelajarinya; tugas dibuat per mapel lalu ditujukan ke satu atau beberapa Kelompok Kelas.</p></div>
+      <div><h1>Materi dan Tugas</h1></div>
       ${canManageMat() ? `<div class="actions"><button class="btn btn-ghost" data-new-mat>${icon('upload', 16)} Unggah materi</button><button class="btn btn-primary" data-new-task>${icon('plus', 16)} Buat tugas</button></div>` : ''}
     </div>
     <div class="stats">
@@ -752,7 +743,7 @@ PanitiaPages.presensi = {
 
     return `
     <div class="page-head">
-      <div><h1>Presensi</h1><p>Presensi dilakukan di <b>room pertemuan</b>: tutor membuka presensi, lalu pelajar menekan tombol lokasi dan harus berada di area tempat sesi. Setelah dibuka, pelajar dapat presensi sepanjang jam pelajaran: ${DB.settings.lateTolerance} menit pertama = Hadir, sesudahnya = Terlambat, tidak presensi sampai jam selesai = Tidak hadir. Halaman ini merangkum sesi hari ini, koreksi presensi, dan audit trail.</p></div>
+      <div><h1>Presensi</h1></div>
     </div>
     ${!s ? `<div class="card">${emptyState('locate', 'Tidak ada sesi', 'Belum ada sesi dalam cakupanmu.')}</div>` : `
     <div class="cols cols-1-1">
@@ -848,8 +839,7 @@ PanitiaPages.perizinan = {
       : App.has('wali') ? ['primary', 'Sebagai <b>Wali Kelas</b>, kamu memilih <b>Terima</b> (diteruskan ke Kurikulum) atau <b>Tolak</b> (pelajar langsung Tidak hadir). Pengajuan yang tidak kamu tindak sampai jam pelajaran selesai otomatis diarsipkan sebagai Tidak hadir.']
       : ['warning', 'Sebagai <b>Ketua BAT</b>, kamu memiliki akses <b>pemantauan</b> tanpa masuk ke alur persetujuan rutin.'];
     return `
-    <div class="page-head"><div><h1>Perizinan</h1><p>Satu pengajuan untuk satu sesi, lampiran bukti wajib. Alur: Pelajar → Wali Kelas (terima / tolak) → Kurikulum (keputusan akhir). Daftar hanya menampilkan pengajuan untuk sesi yang belum lewat; setelah sesi selesai pengajuan masuk <b>Arsip</b>.</p></div></div>
-    <div class="alert alert-${roleNote[0]}" style="margin-bottom:16px">${icon('shield', 16)}<span>${roleNote[1]}</span></div>
+    <div class="page-head"><div><h1>Perizinan</h1></div></div>
     ${Q.seeAll() ? `<div class="stats" style="margin-bottom:16px">
       ${statCard('clipboard', allL.length, 'Total pengajuan', 'primary')}
       ${statCard('clock', active.filter(l => ['wali', 'kurikulum'].includes(l.status)).length, 'Dalam proses', 'warning')}
@@ -942,11 +932,11 @@ PanitiaPages.laporan = {
     const tavg = students.map(s => Q.taskAvg(s.id));
     const tos = students.map(s => Q.lastTO(s.id));
     const watch = students.filter(s => Q.attStats(s.id).pct < 80 || Q.taskAvg(s.id) < 72);
-    const toTrend = [0, 1, 2, 3].map(i => avg(students.map(s => (s.id === 'p1' ? DB.tryouts.map(Q.toAvg) : s.toHist)[i])));
+    const toTrend = [0, 1, 2, 3].map(i => avg(students.map(s => (s.id === 'p1' && DB.tryouts.length > i ? DB.tryouts.map(Q.toAvg) : s.toHist)[i] || 0)));
     const scopeLabel = Q.seeAll() ? 'Rekap menyeluruh seluruh Kelompok Kelas' : App.has('wali') ? 'Pelajar di Kelompok Kelas dampinganmu' : 'Pelajar di Kelompok Kelas yang kamu ajar';
     return `
     <div class="page-head">
-      <div><h1>Laporan Perkembangan</h1><p>${scopeLabel}. Data kehadiran, nilai tugas, dan hasil tryout eksternal.</p></div>
+      <div><h1>Laporan Perkembangan</h1></div>
       <div class="actions"><button class="btn btn-ghost" data-dl>${icon('download', 16)} Unduh rekap</button>${App.has('kurikulum') ? `<button class="btn btn-primary" data-to>${icon('upload', 16)} Input hasil tryout</button>` : ''}</div>
     </div>
     <div class="chips" style="margin-bottom:16px">
@@ -1020,10 +1010,9 @@ PanitiaPages.pengguna = {
     const list = DB.staff.filter(s => UserState.role === 'all' || s.role === UserState.role);
     return `
     <div class="page-head">
-      <div><h1>Pengguna & Peran</h1><p>Kelola akun panitia dan perannya. Setiap akun panitia memegang satu peran operasional.</p></div>
+      <div><h1>Pengguna & Peran</h1></div>
       <div class="actions"><button class="btn btn-primary" data-new-user>${icon('userPlus', 16)} Tambah panitia</button></div>
     </div>
-    <div class="alert alert-primary" style="margin-bottom:16px">${icon('shield', 16)}<span><b>Tutor tidak boleh sekaligus Wali Kelas.</b> Penempatan pelajar, tutor, dan Wali Kelas hanya dapat diubah oleh Kurikulum dan Administrator.</span></div>
     <div class="stats">
       ${statCard('user', DB.staff.filter(s => s.role === 'tutor').length, 'Tutor', 'primary')}
       ${statCard('users', DB.staff.filter(s => s.role === 'wali').length, 'Wali Kelas', 'accent')}
@@ -1101,20 +1090,10 @@ PanitiaPages.pengaturan = {
   title: 'Pengaturan',
   render() {
     const u = App.user;
-    const canSys = App.has('kurikulum');
-    const M = [
-      ['Kelompok Kelas & penempatan', 'Lihat kelompok sendiri', 'Lihat (kelompok diajar)', 'Lihat (1 kelompok dampingan)', 'Kelola & tempatkan', 'Pantau', 'Kelola penuh'],
-      ['Mata Pelajaran', 'Lihat', 'Lihat', 'Lihat', 'Kelola', 'Pantau', 'Kelola penuh'],
-      ['Jadwal sesi', 'Lihat', 'Lihat', 'Lihat', 'Kelola + cek bentrok', 'Pantau', 'Kelola penuh'],
-      ['Materi (per mapel)', 'Akses', 'Kelola mapel diampu', '–', 'Kelola', 'Pantau', 'Kelola penuh'],
-      ['Tugas dan nilai', 'Kumpul, lihat nilai', 'Kelola, menilai', '–', 'Kelola', 'Pantau', 'Kelola penuh'],
-      ['Presensi (lokasi, di room)', 'Tombol lokasi, riwayat, koreksi', 'Buka/tutup sesi sendiri', 'Pantau & edit presensi dampingan', 'Buka/tutup, edit, koreksi, atur lokasi', 'Pantau', 'Kelola penuh'],
-      ['Perizinan (per sesi)', 'Ajukan + lampiran wajib', '–', 'Terima / tolak', 'Keputusan (izin yang diterima Wali)', 'Pantau', 'Kelola penuh'],
-      ['Laporan perkembangan', 'Milik sendiri', 'Kelompok diajar', 'Pelajar dampingan', 'Menyeluruh, input tryout', 'Menyeluruh', 'Menyeluruh'],
-      ['Pengguna & peran', '–', '–', '–', '–', '–', 'Kelola'],
-    ];
+    /* Pengaturan presensi: Tutor, Kurikulum, dan Administrator */
+    const canSys = App.has('kurikulum', 'tutor');
     return `
-    <div class="page-head"><div><h1>Pengaturan</h1><p>Profil akun, peran & hak akses, serta konfigurasi presensi.</p></div></div>
+    <div class="page-head"><div><h1>Pengaturan</h1></div></div>
     <div class="cols cols-3-2">
       <div>
         <div class="card">
@@ -1127,15 +1106,18 @@ PanitiaPages.pengaturan = {
           <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn btn-ghost" data-pw>${icon('lock', 16)} Ubah kata sandi</button><button class="btn btn-primary" data-save-profile>Simpan profil</button></div>
         </div>
         <div class="card mt">
-          <div class="card-head"><h3>${icon('shield', 16)} Matriks hak akses</h3><span class="muted small">Tutor dan Wali Kelas tidak dapat dirangkap</span></div>
-          <div class="table-wrap"><table class="matrix"><thead><tr><th>Fitur</th><th>Pelajar</th><th>Tutor</th><th>Wali Kelas</th><th>Kurikulum</th><th>Ketua BAT</th><th>Administrator</th></tr></thead><tbody>
-            ${M.map(r => `<tr>${r.map((c, i) => `<td>${i === 0 ? `<b>${c}</b>` : c}</td>`).join('')}</tr>`).join('')}
-          </tbody></table></div>
+          <div class="card-head"><h3>${icon('bell', 16)} Notifikasi</h3></div>
+          <p class="muted small" style="margin-bottom:8px">Notifikasi hanya tampil di dalam aplikasi (ikon lonceng). Belum ada pengiriman keluar web.</p>
+          ${[['Pengajuan izin baru', true], ['Pengumpulan tugas', true], ['Koreksi presensi', true], ['Ringkasan harian', false]].map(([t, on]) => `<div class="setting-row"><div><b>${t}</b></div><label class="switch"><input type="checkbox" ${on ? 'checked' : ''} data-toggle><span></span></label></div>`).join('')}
+        </div>
+        <div class="card mt">
+          <div class="setting-row"><div><b>Keluar dari akun</b><small>Akhiri sesi di perangkat ini</small></div><button class="btn btn-sm btn-danger" data-action="logout">${icon('logout', 14)} Keluar</button></div>
         </div>
       </div>
       <div>
-        <div class="card">
-          <div class="card-head"><h3>${icon('locate', 16)} Pengaturan presensi</h3>${canSys ? '' : badge('Hanya Kurikulum/Admin', 'neutral', 'no-dot')}</div>
+        ${yearCard()}
+        <div class="card mt">
+          <div class="card-head"><h3>${icon('locate', 16)} Pengaturan presensi</h3>${canSys ? '' : badge('Hanya Tutor, Kurikulum, Admin', 'neutral', 'no-dot')}</div>
           <div class="form-grid">
             <label class="field"><span>Batas Hadir sejak presensi dibuka (menit)</span><input type="number" id="st-late" value="${DB.settings.lateTolerance}" min="0" max="60" ${canSys ? '' : 'disabled'}></label>
             <label class="field"><span>Radius area presensi (meter)</span><input type="number" id="st-radius" value="${DB.settings.geoRadius}" min="20" max="1000" ${canSys ? '' : 'disabled'}><small class="muted small">Pelajar harus berada dalam radius ini dari titik lokasi tempat sesi.</small></label>
@@ -1154,14 +1136,6 @@ PanitiaPages.pengaturan = {
           </div>
           ${canSys ? `<button class="btn btn-primary btn-block mt" data-save-sys>Simpan pengaturan</button>` : ''}
         </div>
-        <div class="card mt">
-          <div class="card-head"><h3>${icon('bell', 16)} Notifikasi</h3></div>
-          <p class="muted small" style="margin-bottom:8px">Notifikasi hanya tampil di dalam aplikasi (ikon lonceng). Belum ada pengiriman keluar web.</p>
-          ${[['Pengajuan izin baru', true], ['Pengumpulan tugas', true], ['Koreksi presensi', true], ['Ringkasan harian', false]].map(([t, on]) => `<div class="setting-row"><div><b>${t}</b></div><label class="switch"><input type="checkbox" ${on ? 'checked' : ''} data-toggle><span></span></label></div>`).join('')}
-        </div>
-        <div class="card mt">
-          <div class="setting-row"><div><b>Keluar dari akun</b><small>Akhiri sesi di perangkat ini</small></div><button class="btn btn-sm btn-danger" data-action="logout">${icon('logout', 14)} Keluar</button></div>
-        </div>
       </div>
     </div>`;
   },
@@ -1171,12 +1145,12 @@ PanitiaPages.pengaturan = {
       if (e.target.closest('[data-pw]')) return openPasswordModal();
       if (e.target.closest('[data-save-profile]')) return toast('Profil disimpan (demo).');
       if (e.target.closest('[data-add-place]')) {
-        if (!App.has('kurikulum')) return toast('Hanya Kurikulum dan Administrator yang dapat mengubah pengaturan presensi dan titik lokasi.', 'error');
+        if (!App.has('kurikulum', 'tutor')) return toast('Hanya Tutor, Kurikulum, dan Administrator yang dapat mengubah pengaturan presensi dan titik lokasi.', 'error');
                 DB.places.push({ id: 'pl' + Date.now(), name: 'Titik baru', match: 'Titik baru', lat: DB.places[0].lat, lng: DB.places[0].lng });
         return App.refresh();
       }
       if (e.target.closest('[data-here]')) {
-        if (!App.has('kurikulum')) return toast('Hanya Kurikulum dan Administrator yang dapat mengubah pengaturan presensi dan titik lokasi.', 'error');
+        if (!App.has('kurikulum', 'tutor')) return toast('Hanya Tutor, Kurikulum, dan Administrator yang dapat mengubah pengaturan presensi dan titik lokasi.', 'error');
                 if (!navigator.geolocation) return toast('Browser tidak mendukung GPS.', 'error');
         return navigator.geolocation.getCurrentPosition(pos => {
           const row = $$('[data-place]', root).pop();
@@ -1186,7 +1160,7 @@ PanitiaPages.pengaturan = {
         }, () => toast('Lokasi tidak dapat diambil. Periksa izin lokasi browser.', 'error'), { enableHighAccuracy: true, timeout: 10000 });
       }
       if (e.target.closest('[data-save-sys]')) {
-        if (!App.has('kurikulum')) return toast('Hanya Kurikulum dan Administrator yang dapat mengubah pengaturan presensi dan titik lokasi.', 'error');
+        if (!App.has('kurikulum', 'tutor')) return toast('Hanya Tutor, Kurikulum, dan Administrator yang dapat mengubah pengaturan presensi dan titik lokasi.', 'error');
                 DB.settings.lateTolerance = Number($('#st-late', root).value) || 15;
         DB.settings.geoRadius = Math.min(1000, Math.max(20, Number($('#st-radius', root).value) || 100));
         $$('[data-place]', root).forEach(row => {

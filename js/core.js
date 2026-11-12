@@ -9,6 +9,7 @@ const ICONS = {
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
   file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
   qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/>',
+  archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><line x1="10" y1="12" x2="14" y2="12"/>',
   clipboard: '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="m9 14 2 2 4-4"/>',
   chart: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
   user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
@@ -179,10 +180,10 @@ const Q = {
     return Q.student(studentId).avg;
   },
   lastTO(studentId) {
-    if (studentId === 'p1') return Q.toAvg(DB.tryouts[DB.tryouts.length - 1]);
-    const h = Q.student(studentId).toHist; return h[h.length - 1];
+    if (studentId === 'p1' && DB.tryouts.length) return Q.toAvg(DB.tryouts[DB.tryouts.length - 1]);
+    const h = Q.student(studentId).toHist || [0]; return h[h.length - 1];
   },
-  toAvg: t => avg(Object.values(t.scores)),
+  toAvg: t => t ? avg(Object.values(t.scores)) : 0,
 
   /* --- Hak akses & cakupan data --- */
   canPlace: () => App.has('kurikulum'),            // Kurikulum & Administrator: ubah penempatan pelajar, tutor, Wali Kelas
@@ -354,6 +355,7 @@ function openModal({ title, sub = '', body = '', footer = '', size = '', onMount
   requestAnimationFrame(() => bd.classList.add('show'));
   const m = bd.querySelector('.modal');
   if (onMount) onMount(m);
+  if (typeof lockArchiveModal === 'function') lockArchiveModal(m);   // arsip: modal hanya baca
   const first = m.querySelector('input:not([type=hidden]):not([type=file]):not([type=checkbox]):not([type=radio]), select, textarea');
   if (first) setTimeout(() => first.focus(), 60);
   return m;
@@ -782,10 +784,9 @@ Shared.jadwal = isPanitia => ({
 
     return `
     <div class="page-head">
-      <div><h1>${isPanitia ? 'Manajemen Jadwal' : 'Jadwal'}</h1><p>${isPanitia ? 'Setiap sesi terdiri dari Kelompok Kelas, Mata Pelajaran, Tutor, waktu, dan tempat. Seluruh sesi dilaksanakan luring.' : 'Jadwal sesi Kelompok Kelas-mu lengkap dengan mata pelajaran, tutor, dan tempat.'}</p></div>
+      <div><h1>${isPanitia ? 'Manajemen Jadwal' : 'Jadwal'}</h1></div>
       ${canEdit ? `<div class="actions"><button class="btn btn-primary" data-act="add-sess">${icon('plus', 16)} Tambah sesi</button></div>` : ''}
     </div>
-    ${isPanitia && !canEdit ? `<div class="alert alert-primary" style="margin-bottom:16px">${icon('shield', 16)}<span>Jadwal dan penempatan tutor disusun oleh Kurikulum. Hubungi Kurikulum bila perlu perubahan.</span></div>` : ''}
     ${isPanitia ? `<div class="toolbar">
       ${groups.length > 1 ? `<select id="jf-grp" aria-label="Filter Kelompok Kelas"><option value="all">Semua Kelompok Kelas</option>${groups.map(g => `<option value="${g.id}" ${JadwalState.grp === g.id ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select>` : ''}
       <select id="jf-subj" aria-label="Filter Mata Pelajaran"><option value="all">Semua Mata Pelajaran</option>${subjOpts.map(sb => `<option value="${sb.id}" ${JadwalState.subj === sb.id ? 'selected' : ''}>${esc(sb.code)} · ${esc(sb.name)}</option>`).join('')}</select>
