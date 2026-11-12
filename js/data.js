@@ -55,41 +55,41 @@ const DB = (() => {
 
   /* ---------- Mata Pelajaran ---------- */
   const subjects = [
-    { id: 'pu', code: 'PU', name: 'Penalaran Umum', color: '#34d399', active: true,
+    { id: 'pu', code: 'PU', name: 'Penalaran Umum', color: '#17734a', active: true,
       desc: 'Penalaran deduktif, induktif, dan kuantitatif untuk subtes TPS.',
       topics: ['Penalaran Deduktif', 'Penalaran Induktif', 'Silogisme', 'Pola Bilangan', 'Analisis Argumen', 'Pembahasan Soal PU'] },
-    { id: 'pk', code: 'PK', name: 'Pengetahuan Kuantitatif', color: '#8b7bff', active: true,
+    { id: 'pk', code: 'PK', name: 'Pengetahuan Kuantitatif', color: '#5b4aa8', active: true,
       desc: 'Aljabar, fungsi, limit, turunan, peluang, dan statistika dasar.',
       topics: ['Limit Fungsi', 'Turunan & Aplikasinya', 'Peluang & Kombinatorika', 'Barisan & Deret', 'Pembahasan Soal PK'] },
-    { id: 'pm', code: 'PM', name: 'Penalaran Matematika', color: '#60a5fa', active: true,
+    { id: 'pm', code: 'PM', name: 'Penalaran Matematika', color: '#1f5f99', active: true,
       desc: 'Penerapan konsep matematika pada masalah kontekstual sehari-hari.',
       topics: ['Integral Dasar', 'Statistika Data', 'Geometri Kontekstual', 'Pemodelan Matematika', 'Pembahasan Soal PM'] },
-    { id: 'lbi', code: 'LBI', name: 'Literasi Bahasa Indonesia', color: '#ffb547', active: true,
+    { id: 'lbi', code: 'LBI', name: 'Literasi Bahasa Indonesia', color: '#a85a0c', active: true,
       desc: 'Pemahaman bacaan, ide pokok, simpulan, dan evaluasi teks berbahasa Indonesia.',
       topics: ['Ide Pokok & Simpulan', 'Teks Argumentasi', 'Kohesi & Koherensi', 'Evaluasi Bacaan', 'Pembahasan Soal LBI'] },
-    { id: 'lbe', code: 'LBE', name: 'Literasi Bahasa Inggris', color: '#f472b6', active: true,
+    { id: 'lbe', code: 'LBE', name: 'Literasi Bahasa Inggris', color: '#a0336b', active: true,
       desc: 'Reading comprehension, vocabulary in context, dan inferensi teks berbahasa Inggris.',
       topics: ['Reading Comprehension', 'Vocabulary in Context', 'Main Idea & Inference', 'Pembahasan Soal LBE'] },
-    { id: 'pbm', code: 'PBM', name: 'Pemahaman Bacaan & Menulis', color: '#22d3ee', active: true,
+    { id: 'pbm', code: 'PBM', name: 'Pemahaman Bacaan & Menulis', color: '#0f6f7d', active: true,
       desc: 'Ejaan, tata kalimat, paragraf efektif, dan penyuntingan teks.',
       topics: ['Kalimat Efektif', 'Ejaan & Tanda Baca', 'Paragraf Argumentatif', 'Penyuntingan Teks'] },
-    { id: 'ppu', code: 'PPU', name: 'Pengetahuan & Pemahaman Umum', color: '#a3e635', active: true,
+    { id: 'ppu', code: 'PPU', name: 'Pengetahuan & Pemahaman Umum', color: '#5f6d16', active: true,
       desc: 'Wawasan umum, makna kata, dan hubungan antargagasan dalam teks.',
       topics: ['Makna Kata & Istilah', 'Hubungan Antarparagraf', 'Wawasan Sosial', 'Pembahasan Soal PPU'] },
-    { id: 'sbm', code: 'SBM', name: 'Strategi Belajar & Manajemen Waktu', color: '#fb923c', active: false,
+    { id: 'sbm', code: 'SBM', name: 'Strategi Belajar & Manajemen Waktu', color: '#8a4a2b', active: false,
       desc: 'Mapel pendukung tentang teknik belajar efektif dan manajemen waktu ujian. Sedang tidak dijadwalkan.',
       topics: ['Teknik Belajar Aktif', 'Manajemen Waktu Ujian'] },
   ];
 
   /* ---------- Kelompok Kelas ---------- */
   const groups = [
-    { id: 'g1', name: 'Saintek A', color: '#8b7bff', wali: 'Fajar Nugroho',
+    { id: 'g1', name: 'Saintek A', color: '#3b4f9c', wali: 'Fajar Nugroho',
       desc: 'Kelompok persiapan SNBT Saintek dengan fokus Pengetahuan Kuantitatif, Penalaran Matematika, dan Penalaran Umum.' },
-    { id: 'g2', name: 'Saintek B', color: '#22d3ee', wali: 'Putri Maharani',
+    { id: 'g2', name: 'Saintek B', color: '#0f6f7d', wali: 'Putri Maharani',
       desc: 'Kelompok paralel Saintek dengan tambahan Literasi Bahasa Inggris.' },
-    { id: 'g3', name: 'Soshum A', color: '#ffb547', wali: 'Wulan Sari',
+    { id: 'g3', name: 'Soshum A', color: '#a85a0c', wali: 'Wulan Sari',
       desc: 'Kelompok persiapan SNBT Soshum: literasi, pemahaman bacaan, dan pengetahuan umum.' },
-    { id: 'g4', name: 'Gap Year', color: '#f472b6', wali: 'Maya Anggraini',
+    { id: 'g4', name: 'Gap Year', color: '#a0336b', wali: 'Maya Anggraini',
       desc: 'Kelompok untuk alumni dan pejuang gap year dengan ritme intensif di pagi hari.' },
   ];
 
@@ -337,9 +337,73 @@ const DB = (() => {
     { id: 'pl2', name: 'Perpustakaan Kota Yogyakarta', match: 'Perpustakaan Kota', lat: -7.7867, lng: 110.3700 },
   ];
 
-  return {
-    today, T, ymd, D, addMin, sortSessions,
-    roles, accounts, staff, subjects, groups, students, sessions, attendance, assignments, materials,
-    leaves, corrections, audit, announcements, tryouts, notes, activity, notifications, settings, places, rooms, attEdits,
+  /* ---------- Tahun ajaran & arsip ----------
+     Data operasional (YEAR_KEYS) milik satu tahun ajaran. Saat tahun ajaran baru dimulai, data tahun lama
+     dibekukan menjadi arsip (hanya baca) dan tahun baru mulai dengan data kosong.
+     Data induk tetap lintas tahun: akun & panitia, mata pelajaran, pengaturan presensi, titik lokasi. */
+  const YEAR_KEYS = ['groups', 'students', 'sessions', 'attendance', 'assignments', 'materials', 'rooms', 'attEdits',
+    'leaves', 'corrections', 'audit', 'announcements', 'tryouts', 'notes', 'activity'];
+  const shiftDate = (s, n) => { const [y, m, d] = s.split('-').map(Number); return ymd(new Date(y, m - 1, d + n)); };
+  const taStart = today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1;   // TA dimulai Juli
+  const taLabel = y => `${y}/${y + 1}`;
+  const activeStart = `${taStart}-07-01`;
+  const archEnd = shiftDate(activeStart, -1);
+
+  /* Bekukan data satu tahun ajaran menjadi arsip: buang sesi setelah tanggal tutup,
+     tutup room yang masih terbuka, dan selesaikan pengajuan yang masih menunggu. */
+  function finalizeYear(data, { keep, closeDate, at, by }) {
+    data.sessions = data.sessions.filter(keep);
+    const ids = new Set(data.sessions.map(s => s.id));
+    const inYear = x => !x.sessionId || ids.has(x.sessionId);
+    data.leaves = data.leaves.filter(inYear);
+    data.corrections = data.corrections.filter(inYear);
+    data.materials = data.materials.filter(inYear);
+    data.assignments = data.assignments.filter(inYear);
+    data.assignments.forEach(a => { if (a.deadline > closeDate) a.deadline = closeDate; });
+    Object.keys(data.rooms).forEach(k => { if (!ids.has(k)) delete data.rooms[k]; else if (data.rooms[k].open) Object.assign(data.rooms[k], { open: false, closed: true, closedAt: at }); });
+    Object.keys(data.attEdits).forEach(k => { if (!ids.has(k)) delete data.attEdits[k]; });
+    Object.values(data.attendance).forEach(rec => Object.keys(rec).forEach(k => { if (!ids.has(k)) delete rec[k]; }));
+    data.leaves.forEach(l => { if (['wali', 'kurikulum'].includes(l.status)) Object.assign(l, { status: 'kedaluwarsa', expiredAt: at, decisionNote: 'Ditutup otomatis saat pergantian tahun ajaran.' }); });
+    data.corrections.forEach(k => { if (k.status === 'pending') k.status = 'rejected'; });
+    data.audit.unshift({ who: by, at, what: 'Tahun ajaran ditutup dan diarsipkan. Data hanya dapat dilihat.' });
+    return data;
+  }
+  const countsOf = d => ({ students: d.students.length, groups: d.groups.length, sessions: d.sessions.length, tasks: d.assignments.length, materials: d.materials.length, leaves: d.leaves.length });
+
+  /* Arsip dummy tahun lalu: pola data yang sama, tanggal digeser ke semester sebelumnya (hari tetap sama)
+     dan pelajarnya angkatan lain. */
+  const backDays = -7 * Math.ceil(Math.round((today - new Date(archEnd + 'T00:00:00')) / 864e5) / 7);
+  const archT = shiftDate(T, backDays);
+  const oldNames = ['Alya Zahra Kamila', 'Dafa Rizqullah', 'Keisha Anindita', 'Muhammad Ilham Saputra', 'Shafa Nur Azizah', 'Reza Pahlevi',
+    'Annisa Rahma Dewi', 'Bayu Setiawan', 'Zahra Aulia Putri', 'Naufal Hakim', 'Clarissa Wijaya', 'Daffa Arkana', 'Fitri Handayani',
+    'Gilang Ramadhan', 'Hafizh Alfarizi', 'Indah Cahyani', 'Jihan Nabila', 'Kurniawan Adi', 'Laila Puspasari', 'Rendra Prakoso',
+    'Nabila Syafira', 'Oktavia Ningsih', 'Pandu Wiratama', 'Qonita Salsabila'];
+  const nameMap = students.map((s, i) => [s.name, oldNames[i]]);
+  const reText = v => {
+    let s = v.replace(/\b\d{4}-\d{2}-\d{2}\b/g, m => shiftDate(m, backDays)).replace(/Alumni (\d{4})/, (m, y) => `Alumni ${y - 1}`);
+    nameMap.forEach(([a, b]) => { if (s.includes(a)) s = s.split(a).join(b); });
+    return s.replace(/\bNadia\b/g, 'Alya');
   };
+  const remap = v => Array.isArray(v) ? v.map(remap)
+    : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, remap(x)]))
+    : typeof v === 'string' ? reText(v) : v;
+  const live = { groups, students, sessions, attendance, assignments, materials, rooms, attEdits, leaves, corrections, audit, announcements, tryouts, notes, activity };
+  const archived = finalizeYear(remap(live), { keep: s => s.date < archT, closeDate: archEnd, at: `${archEnd} 10:00`, by: 'Anindya Kirana' });
+  archived.students.forEach(s => { s.email = s.name.split(' ')[0].toLowerCase() + '@bat.id'; });
+
+  const years = [
+    { id: taLabel(taStart - 1), status: 'arsip', start: `${taStart - 1}-07-01`, end: archEnd, closedAt: `${archEnd} 10:00`, closedBy: 'Anindya Kirana', T: archT, data: archived, counts: countsOf(archived) },
+    { id: taLabel(taStart), status: 'aktif', start: activeStart, end: '', closedAt: '', closedBy: '', T: null, data: null, counts: null },
+  ];
+
+  const api = {
+    today, T, ymd, addMin, sortSessions, shiftDate, finalizeYear, countsOf,
+    YEAR_KEYS, years, viewYear: taLabel(taStart),
+    roles, accounts, staff, subjects, settings, places, notifications, ...live,
+  };
+  /* Tanggal relatif selalu dihitung dari "hari ini" tahun yang sedang dilihat (arsip memakai tanggal tutupnya) */
+  api.D = n => shiftDate(api.T, n);
+  /* sortSessions mengurutkan array sesi yang sedang aktif di DB */
+  api.sortSessions = () => api.sessions.sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
+  return api;
 })();

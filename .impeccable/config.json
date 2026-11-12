@@ -1,0 +1,20 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "cascadia code",
+        "createdAt": "2026-11-12T03:25:39.808Z",
+        "reason": "Claude decided: monospace stack used only for code, presence codes and generated passwords; documented in DESIGN.md (Label/Mono Font)"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "consolas",
+        "createdAt": "2026-11-12T03:25:40.037Z",
+        "reason": "Claude decided: monospace stack used only for code, presence codes and generated passwords; documented in DESIGN.md (Label/Mono Font)"
+      }
+    ]
+  }
+}

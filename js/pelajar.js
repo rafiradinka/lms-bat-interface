@@ -38,14 +38,14 @@ PelajarPages.beranda = {
 
     return `
     <div class="page-head">
-      <div><p class="eyebrow">${fmtLong(todayStr())}</p><h1>${greeting()}, ${esc(firstName(me.name))}!</h1><p>Kelompok Kelas <b>${esc(g.name)}</b> · Wali Kelas ${esc(g.wali)}. BAT?! Show The Way~</p></div>
+      <div><p class="eyebrow">${fmtLong(todayStr())}</p><h1>${greeting()}, ${esc(firstName(me.name))}!</h1></div>
     </div>
     ${hero}
     <div class="stats">
       ${statCard('checkCircle', st.pct + '%', 'Kehadiran', 'success', `${st.hadir + st.terlambat} dari ${st.total} sesi`)}
       ${statCard('file', pending.length, 'Tugas tertunda', 'warning', pending[0] ? `Terdekat ${relDay(pending[0].deadline).toLowerCase()}` : 'Semua beres!')}
       ${statCard('target', Q.taskAvg(me.id) || '–', 'Rata-rata nilai', 'primary', `${graded.length} tugas dinilai`)}
-      ${statCard('trending', Q.toAvg(lastTO), 'Skor tryout terakhir', 'accent', `${Q.toAvg(lastTO) - Q.toAvg(prevTO) >= 0 ? '+' : ''}${Q.toAvg(lastTO) - Q.toAvg(prevTO)} dari sebelumnya`)}
+      ${statCard('trending', lastTO ? Q.toAvg(lastTO) : '–', 'Skor tryout terakhir', 'accent', prevTO ? `${Q.toAvg(lastTO) - Q.toAvg(prevTO) >= 0 ? '+' : ''}${Q.toAvg(lastTO) - Q.toAvg(prevTO)} dari sebelumnya` : lastTO ? 'Tryout pertama' : 'Belum ada tryout')}
     </div>
     <div class="cols cols-3-2">
       <div class="card">
@@ -65,7 +65,7 @@ PelajarPages.beranda = {
     <div class="cols cols-3-2">
       <div class="card">
         <div class="card-head"><h3>${icon('trending', 16)} Ringkasan nilai tugas</h3><a class="link" href="#/laporan">Laporan lengkap ${icon('right', 14)}</a></div>
-        ${graded.length ? lineChart(graded.map(a => ({ label: a.title.split(' ').slice(0, 2).join(' '), value: a.my.score })), { min: 50, max: 100, h: 200 }) : emptyState('chart', 'Belum ada nilai')}
+        ${graded.length ? lineChart(graded.map(a => ({ label: a.title.split(' ').slice(0, 2).join(' '), value: a.my.score })), { min: 50, max: 100, h: 340 }) : emptyState('chart', 'Belum ada nilai')}
       </div>
       <div class="card">
         <div class="card-head"><h3>${icon('calendar', 16)} Sesi 7 hari ke depan</h3><a class="link" href="#/jadwal">Jadwal ${icon('right', 14)}</a></div>
@@ -103,7 +103,7 @@ PelajarPages.tugas = {
     const tasks = Q.myTasks(), subs = mySubjectsPel();
     const pending = tasks.filter(a => a.my.status === 'belum').sort((a, b) => a.deadline.localeCompare(b.deadline));
     return `
-    <div class="page-head"><div><h1>Materi dan Tugas</h1><p>Pilih mata pelajaran untuk membuka materi dan tugasnya. Kumpulkan tugas sebelum tenggat dan lihat nilai serta umpan balik tutor.</p></div></div>
+    <div class="page-head"><div><h1>Materi dan Tugas</h1></div></div>
     <div class="stats">
       ${statCard('clock', pending.length, 'Belum dikumpul', 'warning')}
       ${statCard('upload', tasks.filter(a => a.my.status === 'dikumpul').length, 'Menunggu nilai', 'info')}
@@ -192,7 +192,7 @@ PelajarPages.tugas = {
     let file = null;
     openModal({
       title: 'Kumpulkan tugas', sub: `${sb.code} · ${a.title}`,
-      body: `<div class="feedback" style="border-left-color:${sb.color}">${esc(a.desc)}</div>
+      body: `<div class="feedback">${esc(a.desc)}</div>
         <div class="meta-row"><span>${icon('clock', 14)} Tenggat ${fmtDay(a.deadline)}, ${a.time} (${relDay(a.deadline)})</span></div>
         <div class="field"><span>Berkas tugas</span>${dropzone('sub-file', 'PDF, DOCX, JPG, PNG · maks. 10 MB')}<small class="field-err" id="sub-err"></small></div>
         <label class="field"><span>Catatan untuk tutor (opsional)</span><textarea id="sub-note" placeholder="cth. Nomor 7 saya masih ragu caranya…"></textarea></label>`,
@@ -238,7 +238,7 @@ PelajarPages.presensi = {
     const st = Q.attStats(me.id);
     const todays = Q.todaySessions([me.groupId]).filter(s => Q.state(s).key !== 'selesai');
     return `
-    <div class="page-head"><div><h1>Riwayat Presensi</h1><p>Rekap kehadiranmu di setiap pertemuan. Presensi dilakukan di <b>room pertemuan</b> dengan tombol lokasi setelah tutor membuka presensi.</p></div></div>
+    <div class="page-head"><div><h1>Riwayat Presensi</h1></div></div>
     ${todays.length ? `<div class="note primary" style="margin:0 0 16px">${icon('locate', 15)}<span>Ada sesi hari ini: ${todays.map(s => `<a href="#/sesi/${s.id}" style="text-decoration:underline;font-weight:700">${esc(Q.subj(s.subjectId).code)} · ${s.start}</a>`).join(', ')}. Masuk ke room untuk presensi.</span></div>` : ''}
     <div class="stats">
       ${statCard('checkCircle', st.pct + '%', 'Kehadiran', 'success', `${st.hadir + st.terlambat} dari ${st.total} sesi`)}
@@ -271,7 +271,7 @@ PelajarPages.presensi = {
     const rows = DB.sessions.filter(s => rec[s.id] && s.date <= todayStr())
       .filter(s => PresensiPel.filter === 'semua' || rec[s.id].status === PresensiPel.filter).reverse();
     if (!rows.length) return emptyState('history', 'Belum ada data', 'Tidak ada riwayat pada kategori ini.');
-    return `<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Mapel</th><th>Topik</th><th>Waktu</th><th>Status</th><th></th></tr></thead><tbody>
+    return `<div class="table-wrap"><table class="att-table"><thead><tr><th>Tanggal</th><th>Mapel</th><th>Topik</th><th>Waktu</th><th>Status</th><th></th></tr></thead><tbody>
       ${rows.map(s => {
         const r = rec[s.id], m = ATT[r.status];
         const corr = DB.corrections.find(k => k.studentId === me.id && k.sessionId === s.id);
@@ -304,13 +304,7 @@ PelajarPages.izin = {
     const wali = Q.waliOf(me);
     const steps = ['Pilih satu sesi', 'Alasan', 'Lampiran & kirim'];
     return `
-    <div class="page-head"><div><h1>Pengajuan Izin</h1><p>Satu pengajuan berlaku untuk <b>satu sesi</b> dan wajib menyertakan <b>lampiran bukti</b>. Jika disetujui, status presensi sesi tersebut otomatis menjadi “Izin”. Jika ditolak atau tidak ditindak sampai sesi selesai, tercatat <b>Tidak hadir</b>.</p></div></div>
-    <div class="flow">
-      <span class="flow-step"><i>1</i> Pelajar mengisi formulir</span><span class="arrow">${icon('arrowRight', 14)}</span>
-      <span class="flow-step"><i>2</i> Wali Kelas terima / tolak</span><span class="arrow">${icon('arrowRight', 14)}</span>
-      <span class="flow-step"><i>3</i> Kurikulum memutuskan (bila diterima)</span><span class="arrow">${icon('arrowRight', 14)}</span>
-      <span class="flow-step"><i>✓</i> Presensi diperbarui</span>
-    </div>
+    <div class="page-head"><div><h1>Pengajuan Izin</h1></div></div>
     <div class="cols cols-3-2">
       <div class="card">
         <div class="card-head"><h3>Formulir izin</h3><span class="muted small">Langkah ${IzinState.step} dari 3</span></div>
@@ -421,18 +415,18 @@ PelajarPages.laporan = {
       const ok = ss.filter(s => ['hadir', 'terlambat'].includes(rec[s.id].status)).length;
       return { sb, pct: ss.length ? Math.round(ok / ss.length * 100) : 0, n: ss.length };
     });
-    const subs = Object.keys(last.scores);
+    const subs = last ? Object.keys(last.scores) : [];
     const SUB_NAME = { PU: 'Penalaran Umum', PPU: 'Pengetahuan & Pemahaman Umum', PBM: 'Pemahaman Bacaan & Menulis', PK: 'Pengetahuan Kuantitatif', LBI: 'Literasi B. Indonesia', LBE: 'Literasi B. Inggris', PM: 'Penalaran Matematika' };
     return `
     <div class="page-head">
-      <div><h1>Laporan Perkembangan</h1><p>Pantau kehadiran per mata pelajaran, nilai tugas, hasil tryout eksternal, dan catatan evaluasi dari tutor & Wali Kelas.</p></div>
+      <div><h1>Laporan Perkembangan</h1></div>
       <div class="actions"><button class="btn btn-ghost" data-pdf>${icon('download', 16)} Unduh laporan</button></div>
     </div>
     <div class="stats">
       ${statCard('checkCircle', st.pct + '%', 'Kehadiran', 'success', `${st.total} sesi tercatat`)}
       ${statCard('target', Q.taskAvg(me.id), 'Rata-rata nilai tugas', 'primary', `${graded.length} tugas dinilai`)}
       ${statCard('file', `${done}/${tasks.length}`, 'Tugas terkumpul', 'info', `${tasks.length ? Math.round(done / tasks.length * 100) : 0}% progres`)}
-      ${statCard('trending', Q.toAvg(last), 'Rata-rata tryout', 'accent', `${Q.toAvg(last) - Q.toAvg(prev) >= 0 ? '▲ +' : '▼ '}${Q.toAvg(last) - Q.toAvg(prev)} dari TO sebelumnya`)}
+      ${statCard('trending', last ? Q.toAvg(last) : '–', 'Rata-rata tryout', 'accent', prev ? `${trendMark(Q.toAvg(last) - Q.toAvg(prev))} dari TO sebelumnya` : last ? 'Tryout pertama' : 'Belum ada tryout')}
     </div>
     <div class="cols cols-1-1">
       <div class="card">
@@ -452,11 +446,11 @@ PelajarPages.laporan = {
     <div class="cols cols-3-2">
       <div class="card">
         <div class="card-head"><h3>Performa tryout eksternal</h3><span class="muted small">Diinput oleh Kurikulum</span></div>
-        ${lineChart(tos.map((t, i) => ({ label: 'TO #' + (i + 1), value: Q.toAvg(t) })), { min: 400, max: 700, color: '#ffb547', steps: 3 })}
+        ${tos.length < 2 ? emptyState('chart', 'Belum cukup data tryout', 'Grafik dan perbandingan subtes tampil setelah ada minimal dua tryout di tahun ajaran ini.') : `${lineChart(tos.map((t, i) => ({ label: 'TO #' + (i + 1), value: Q.toAvg(t) })), { min: 400, max: 700, color: '#a0336b', steps: 3 })}
         <div class="divider"></div>
         <div class="table-wrap"><table style="min-width:520px"><thead><tr><th>Subtes</th><th>${esc(prev.name.replace('Tryout Eksternal ', 'TO '))}</th><th>${esc(last.name.replace('Tryout Eksternal ', 'TO '))}</th><th>Perubahan</th></tr></thead><tbody>
-          ${subs.map(k => { const d = last.scores[k] - prev.scores[k]; return `<tr><td><b>${k}</b><div class="muted small">${SUB_NAME[k]}</div></td><td>${prev.scores[k]}</td><td><b>${last.scores[k]}</b></td><td class="${d >= 0 ? 'text-success' : 'text-danger'}"><b>${d >= 0 ? '▲ +' : '▼ '}${d}</b></td></tr>`; }).join('')}
-        </tbody></table></div>
+          ${subs.map(k => { const d = last.scores[k] - prev.scores[k]; return `<tr><td><b>${k}</b><div class="muted small">${SUB_NAME[k]}</div></td><td>${prev.scores[k]}</td><td><b>${last.scores[k]}</b></td><td class="${d >= 0 ? 'text-success' : 'text-danger'}"><b>${trendMark(d)}</b></td></tr>`; }).join('')}
+        </tbody></table></div>`}
       </div>
       <div class="card">
         <div class="card-head"><h3>${icon('edit', 16)} Catatan evaluasi</h3></div>
@@ -476,7 +470,7 @@ PelajarPages.profil = {
     const me = Q.me(), g = Q.grp(me.groupId);
     const st = Q.attStats(me.id);
     return `
-    <div class="page-head"><div><h1>Profil</h1><p>Informasi akun dan preferensi notifikasi.</p></div></div>
+    <div class="page-head"><div><h1>Profil</h1></div></div>
     <div class="cols cols-3-2">
       <div>
         <div class="card profile-card">

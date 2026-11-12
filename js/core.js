@@ -9,6 +9,7 @@ const ICONS = {
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
   file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
   qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/>',
+  archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><line x1="10" y1="12" x2="14" y2="12"/>',
   clipboard: '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="m9 14 2 2 4-4"/>',
   chart: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
   user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
@@ -47,6 +48,7 @@ const ICONS = {
   link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   slides: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
   target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  trendDown: '<polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/>',
   trending: '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
   lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   mail: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
@@ -62,11 +64,11 @@ const ICONS = {
 };
 const icon = (n, s = 18) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
 
-const LOGO = (s = 38) => `<svg width="${s}" height="${s}" viewBox="0 0 48 48" aria-label="Logo BAT">
-  <defs><linearGradient id="batlg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a596ff"/><stop offset="1" stop-color="#6b5af8"/></linearGradient></defs>
-  <rect width="48" height="48" rx="13" fill="url(#batlg)"/>
-  <path fill="#0d0f17" d="M24 34c-1.6-2.7-3.3-3.7-5-3.7-1.8 0-3 .9-3.8 2.1-1.3-1.9-3.8-3-7.2-2.5 2.6-2 4-4.8 3.9-8.3 2.8 1.4 6.2 1.4 9 .1l1.8-4.4 1.3 2.5h1.6l1.3-2.5 1.8 4.4c2.8 1.3 6.2 1.3 9-.1-.1 3.5 1.3 6.3 3.9 8.3-3.4-.5-5.9.6-7.2 2.5-.8-1.2-2-2.1-3.8-2.1-1.7 0-3.4 1-5 3.7z"/>
-  <circle cx="22.4" cy="21.6" r=".9" fill="#ffb547"/><circle cx="25.6" cy="21.6" r=".9" fill="#ffb547"/>
+/* Tanda sementara: bohlam putih di atas biru keabu-abuan. Ganti dengan berkas logo resmi BAT bila sudah tersedia. */
+const LOGO = (s = 38) => `<svg width="${s}" height="${s}" viewBox="0 0 48 48" role="img" aria-label="Logo BAT">
+  <rect width="48" height="48" rx="9" fill="#6485a3"/>
+  <path fill="#fff" d="M24 9.5a10.5 10.5 0 0 0-6.4 18.8c1.3 1 2.1 2.4 2.1 4v.9h8.6v-.9c0-1.6.8-3 2.1-4A10.5 10.5 0 0 0 24 9.5z"/>
+  <rect x="19.7" y="35.2" width="8.6" height="2.4" rx="1.2" fill="#fff"/><rect x="21.4" y="39" width="5.2" height="2.2" rx="1.1" fill="#fff"/>
 </svg>`;
 
 /* ---------- Util ---------- */
@@ -91,6 +93,14 @@ const hashStr = s => { let h = 2166136261; for (const ch of String(s)) { h ^= ch
 const initials = n => n.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 const firstName = n => n.split(' ')[0];
 const avatar = (name, cls = '') => `<span class="avatar ${cls}" style="--h:${hashStr(name) % 360}" title="${esc(name)}">${initials(name)}</span>`;
+/* Deret bulatan lembar jawaban: H · T · I · A, satu terisi sesuai status presensi */
+const ATT_LETTER = { hadir: 'H', terlambat: 'T', izin: 'I', alpa: 'A' };
+const attMark = status => {
+  const m = ATT[status];
+  return `<span class="att-mark ${m ? 'att-' + status : ''}"><span class="bub-row" aria-hidden="true">${Object.keys(ATT_LETTER).map(k => `<i class="${k === status ? 'on' : ''}">${ATT_LETTER[k]}</i>`).join('')}</span><b>${m ? m.label : 'Belum'}</b></span>`;
+};
+/* Penanda naik/turun dengan ikon garis, bukan glif */
+const trendMark = d => `<span class="trend">${icon(d >= 0 ? 'trending' : 'trendDown', 14)}${d >= 0 ? '+' : ''}${d}</span>`;
 const badge = (t, tone = 'neutral', cls = '') => `<span class="badge b-${tone} ${cls}">${t}</span>`;
 /* tag Kelompok Kelas (nama) dan tag Mata Pelajaran (kode) */
 const tag = g => g ? `<span class="tag" style="--c:${g.color}">${esc(g.name)}</span>` : '';
@@ -121,7 +131,7 @@ const TASK = {
   dinilai: { label: 'Dinilai', tone: 'success' },
 };
 const MAT_ICON = { PDF: 'file', PPT: 'slides', Video: 'video', Link: 'link' };
-const MAT_COLOR = { PDF: '#f87171', PPT: '#ffb547', Video: '#8b7bff', Link: '#60a5fa' };
+const MAT_COLOR = { PDF: '#b3321f', PPT: '#a85a0c', Video: '#5b4aa8', Link: '#1f5f99' };
 
 /* ---------- Query helper (akses data dummy) ---------- */
 const Q = {
@@ -170,10 +180,10 @@ const Q = {
     return Q.student(studentId).avg;
   },
   lastTO(studentId) {
-    if (studentId === 'p1') return Q.toAvg(DB.tryouts[DB.tryouts.length - 1]);
-    const h = Q.student(studentId).toHist; return h[h.length - 1];
+    if (studentId === 'p1' && DB.tryouts.length) return Q.toAvg(DB.tryouts[DB.tryouts.length - 1]);
+    const h = Q.student(studentId).toHist || [0]; return h[h.length - 1];
   },
-  toAvg: t => avg(Object.values(t.scores)),
+  toAvg: t => t ? avg(Object.values(t.scores)) : 0,
 
   /* --- Hak akses & cakupan data --- */
   canPlace: () => App.has('kurikulum'),            // Kurikulum & Administrator: ubah penempatan pelajar, tutor, Wali Kelas
@@ -345,6 +355,7 @@ function openModal({ title, sub = '', body = '', footer = '', size = '', onMount
   requestAnimationFrame(() => bd.classList.add('show'));
   const m = bd.querySelector('.modal');
   if (onMount) onMount(m);
+  if (typeof lockArchiveModal === 'function') lockArchiveModal(m);   // arsip: modal hanya baca
   const first = m.querySelector('input:not([type=hidden]):not([type=file]):not([type=checkbox]):not([type=radio]), select, textarea');
   if (first) setTimeout(() => first.focus(), 60);
   return m;
@@ -409,10 +420,10 @@ function donut(segs, { size = 150, stroke = 16, label = '', sub = '' } = {}) {
   }).join('');
   return `<div class="donut" style="width:${size}px;height:${size}px"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform:rotate(-90deg)"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--surface-3)" stroke-width="${stroke}"/>${arcs}</svg><div class="donut-center"><b>${label}</b><span>${sub}</span></div></div>`;
 }
-const legend = segs => `<div class="legend">${segs.map(s => `<div style="--c:${s.color}"><i></i><span>${s.label}</span><b>${s.value}</b></div>`).join('')}</div>`;
+const legend = segs => `<div class="legend">${segs.map(s => `<div style="--c:${s.color}"><i>${s.letter || ''}</i><span>${s.label}</span><b>${s.value}</b></div>`).join('')}</div>`;
 
 let _chartId = 0;
-function lineChart(data, { min = 0, max = 100, color = '#8b7bff', h = 230, w = 640, steps = 4, suffix = '' } = {}) {
+function lineChart(data, { min = 0, max = 100, color = '#2f4d6a', h = 230, w = 640, steps = 4, suffix = '' } = {}) {
   const id = 'lg' + (++_chartId);
   const pad = { l: 40, r: 18, t: 18, b: 32 };
   const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
@@ -426,10 +437,10 @@ function lineChart(data, { min = 0, max = 100, color = '#8b7bff', h = 230, w = 6
   const pts = data.map((d, i) => [x(i), y(d.value)]);
   const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
   const area = `${line} L${pts[pts.length - 1][0]} ${pad.t + ih} L${pts[0][0]} ${pad.t + ih} Z`;
-  const dots = data.map((d, i) => `<circle class="pt" cx="${pts[i][0]}" cy="${pts[i][1]}" r="4.5" fill="#131722" stroke="${color}" stroke-width="2.5"><title>${d.label}: ${d.value}${suffix}</title></circle>`).join('');
-  const labels = data.map((d, i) => `<text x="${pts[i][0]}" y="${h - 8}" text-anchor="middle">${d.label}</text>`).join('');
-  const vals = data.map((d, i) => `<text x="${pts[i][0]}" y="${pts[i][1] - 12}" text-anchor="middle" style="fill:var(--text-2);font-weight:700">${d.value}</text>`).join('');
-  return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".32"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${grid}<path d="${area}" fill="url(#${id})"/><path d="${line}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>${dots}${vals}${labels}</svg>`;
+  const dots = data.map((d, i) => `<circle class="pt" cx="${pts[i][0]}" cy="${pts[i][1]}" r="4.5" fill="#ffffff" stroke="${color}" stroke-width="2.5"><title>${d.label}: ${d.value}${suffix}</title></circle>`).join('');
+  const labels = data.map((d, i) => `<text x="${pts[i][0]}" y="${h - 8}" text-anchor="${data.length > 1 && i === 0 ? 'start' : data.length > 1 && i === data.length - 1 ? 'end' : 'middle'}">${d.label}</text>`).join('');
+  const vals = data.map((d, i) => `<text x="${pts[i][0] + (i === 0 && data.length > 1 ? 4 : 0)}" y="${pts[i][1] - 12}" text-anchor="${data.length > 1 && i === 0 ? 'start' : data.length > 1 && i === data.length - 1 ? 'end' : 'middle'}" style="fill:var(--text-2);font-weight:700">${d.value}</text>`).join('');
+  return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".14"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${grid}<path d="${area}" fill="url(#${id})"/><path d="${line}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>${dots}${vals}${labels}</svg>`;
 }
 function barChart(data, { max, suffix = '' } = {}) {
   const m = max || Math.max(...data.map(d => d.value || 0), 1);
@@ -476,10 +487,10 @@ const annItem = a => {
 /* ---------- Ringkasan kehadiran (donut + legenda) ---------- */
 function attSummary(st, size = 150) {
   const segs = [
-    { label: 'Hadir', value: st.hadir, color: ATT.hadir.color },
-    { label: 'Terlambat', value: st.terlambat, color: ATT.terlambat.color },
-    { label: 'Izin', value: st.izin, color: ATT.izin.color },
-    { label: 'Tidak hadir', value: st.alpa, color: ATT.alpa.color },
+    { label: 'Hadir', letter: 'H', value: st.hadir, color: ATT.hadir.color },
+    { label: 'Terlambat', letter: 'T', value: st.terlambat, color: ATT.terlambat.color },
+    { label: 'Izin', letter: 'I', value: st.izin, color: ATT.izin.color },
+    { label: 'Tidak hadir', letter: 'A', value: st.alpa, color: ATT.alpa.color },
   ];
   return `<div class="donut-wrap">${donut(segs, { size, label: st.pct + '%', sub: 'kehadiran' })}${legend(segs)}</div>`;
 }
@@ -636,7 +647,7 @@ Shared.bindGroupActions = root => {
 };
 
 /* ---------- Form tambah/ubah Kelompok Kelas (Kurikulum & Administrator) ---------- */
-const GROUP_COLORS = ['#8b7bff', '#22d3ee', '#ffb547', '#f472b6', '#34d399', '#60a5fa', '#a3e635', '#fb923c'];
+const GROUP_COLORS = ['#3b4f9c', '#0f6f7d', '#a85a0c', '#a0336b', '#17734a', '#1f5f99', '#5f6d16', '#8a4a2b'];
 Shared.groupForm = id => {
   const g = id ? Q.grp(id) : null;
   // 1 Wali Kelas = 1 Kelompok Kelas: hanya wali yang belum mendampingi kelompok lain yang bisa dipilih
@@ -773,10 +784,9 @@ Shared.jadwal = isPanitia => ({
 
     return `
     <div class="page-head">
-      <div><h1>${isPanitia ? 'Manajemen Jadwal' : 'Jadwal'}</h1><p>${isPanitia ? 'Setiap sesi terdiri dari Kelompok Kelas, Mata Pelajaran, Tutor, waktu, dan tempat. Seluruh sesi dilaksanakan luring.' : 'Jadwal sesi Kelompok Kelas-mu lengkap dengan mata pelajaran, tutor, dan tempat.'}</p></div>
+      <div><h1>${isPanitia ? 'Manajemen Jadwal' : 'Jadwal'}</h1></div>
       ${canEdit ? `<div class="actions"><button class="btn btn-primary" data-act="add-sess">${icon('plus', 16)} Tambah sesi</button></div>` : ''}
     </div>
-    ${isPanitia && !canEdit ? `<div class="alert alert-primary" style="margin-bottom:16px">${icon('shield', 16)}<span>Jadwal dan penempatan tutor disusun oleh Kurikulum. Hubungi Kurikulum bila perlu perubahan.</span></div>` : ''}
     ${isPanitia ? `<div class="toolbar">
       ${groups.length > 1 ? `<select id="jf-grp" aria-label="Filter Kelompok Kelas"><option value="all">Semua Kelompok Kelas</option>${groups.map(g => `<option value="${g.id}" ${JadwalState.grp === g.id ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select>` : ''}
       <select id="jf-subj" aria-label="Filter Mata Pelajaran"><option value="all">Semua Mata Pelajaran</option>${subjOpts.map(sb => `<option value="${sb.id}" ${JadwalState.subj === sb.id ? 'selected' : ''}>${esc(sb.code)} · ${esc(sb.name)}</option>`).join('')}</select>

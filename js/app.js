@@ -48,14 +48,14 @@ const LoginPage = {
         <div class="hero-glow"></div><div class="hero-grid"></div>
         <div class="brand">${LOGO(46)}<div><b>LMS BAT</b><span>Bimbingan Alumni Tutoring</span></div></div>
         <div class="hero-copy">
-          <span class="eyebrow-pill">${icon('sparkle', 14)} Persiapan UTBK/SNBT · Yogyakarta</span>
-          <h1>Satu tempat untuk <span class="grad">belajar, hadir,</span> dan berkembang bersama.</h1>
+          <h1>Satu tempat untuk belajar, hadir, dan berkembang bersama.</h1>
           <p>Kelompok Kelas, jadwal sesi, materi, tugas, presensi berbasis lokasi, hingga perizinan, semuanya terintegrasi dalam satu aplikasi web komunitas BAT.</p>
+          <p class="hero-place">Persiapan UTBK/SNBT · Yogyakarta</p>
           <div class="value-chips"><span>Inklusif</span><span>Growth</span><span>Impact</span><span>Commitment</span></div>
         </div>
         <div class="hero-preview">
           <div class="pv-card"><small>Kehadiran</small><b>94%</b>${progress(94, 'var(--success)')}<p class="muted small" style="margin-top:8px">22 dari 24 sesi</p></div>
-          <div class="pv-card"><small>Izin</small><b style="font-size:16px;margin-top:8px">Disetujui ✓</b>
+          <div class="pv-card"><small>Izin</small><b class="pv-ok" style="font-size:16px;margin-top:8px">${icon('checkCircle', 18)} Disetujui</b>
             <div class="timeline" style="margin-top:6px"><div class="tl done"><span>Wali Kelas</span></div><div class="tl done"><span>Kurikulum</span></div></div></div>
         </div>
         <p class="hero-motto">“BAT?! Show The Way~”</p>
@@ -67,7 +67,7 @@ const LoginPage = {
           <div class="alert alert-danger hidden" id="login-error" role="alert">${icon('alert', 16)}<span></span></div>
           <label class="field" id="f-email"><span>Email</span><div class="input-ic">${icon('mail', 18)}<input type="email" id="email" placeholder="nama@bat.id" autocomplete="username"></div><small class="field-err"></small></label>
           <label class="field" id="f-pass"><span>Kata sandi</span><div class="input-ic">${icon('lock', 18)}<input type="password" id="password" placeholder="••••••••" autocomplete="current-password"><button type="button" class="pw-toggle" id="pw-toggle" aria-label="Tampilkan kata sandi">${icon('eye', 18)}</button></div><small class="field-err"></small></label>
-          <div class="row-between"><label class="check"><input type="checkbox" checked> Ingat saya</label><a href="#" id="forgot" style="color:var(--primary);font-weight:700;font-size:13px">Lupa kata sandi?</a></div>
+          <div class="row-between"><label class="check"><input type="checkbox" checked> Ingat saya</label><a href="#" id="forgot" style="color:var(--primary);font-weight:700;font-size:13.5px;text-decoration:underline">Lupa kata sandi?</a></div>
           <button class="btn btn-primary btn-lg btn-block" type="submit" id="login-btn">Masuk</button>
           <div class="demo-box">
             <p>Akun demo · kata sandi <code>bat123</code></p>
@@ -120,7 +120,7 @@ const LoginPage = {
         const st = acc.studentId && Q.student(acc.studentId);
         if (acc.studentId && (!st || !Q.isActive(st))) {
           btn.classList.remove('loading'); btn.textContent = 'Masuk';
-          showAlert('Akun pelajar ini sedang dinonaktifkan. Hubungi Kurikulum BAT.');
+          showAlert(st ? 'Akun pelajar ini sedang dinonaktifkan. Hubungi Kurikulum BAT.' : `Akun ini tidak terdaftar di tahun ajaran ${TA.active.id}. Hubungi Kurikulum BAT untuk pendaftaran ulang.`);
           return;
         }
         login(acc);
@@ -139,6 +139,7 @@ function login(acc) {
 }
 function logout() {
   Cleanup.run();
+  if (TA.isArchive) TA.backToActive();
   App.user = null;
   sessionStorage.removeItem('bat_user');
   history.replaceState(null, '', location.pathname);
@@ -162,6 +163,7 @@ function buildShell() {
     <aside class="sidebar" id="sidebar" aria-label="Navigasi utama">
       <div class="side-brand">${LOGO(38)}<div><b>LMS BAT</b><span>Bimbingan Alumni Tutoring</span></div><button class="icon-btn side-close" data-action="close-sidebar" aria-label="Tutup menu">${icon('x')}</button></div>
       <div class="side-user">${avatar(u.name)}<div class="side-user-info"><b>${esc(u.name)}</b><span>${esc(roleText)}</span></div></div>
+      ${App.isPanitia ? yearSwitch() : ''}
       ${App.isPanitia ? `<div class="role-switch"><label for="role-switch">Demo · ganti akun panitia</label><select id="role-switch">${DB.accounts.filter(a => a.type === 'panitia').map(a => `<option value="${a.email}" ${a.email === u.email ? 'selected' : ''}>${a.label} — ${firstName(a.name)}</option>`).join('')}</select></div>` : ''}
       <nav class="side-nav">
         <p class="nav-label">${App.isPanitia ? 'Menu Panitia' : 'Menu Pelajar'}</p>
@@ -175,12 +177,14 @@ function buildShell() {
         <button class="icon-btn menu-btn" data-action="open-sidebar" aria-label="Buka menu">${icon('menu')}</button>
         <div class="topbar-title"><h2 id="page-title">LMS BAT</h2><span id="page-crumb">${App.isPanitia ? 'Panitia' : 'Pelajar'}</span></div>
         <div class="topbar-actions">
+          ${App.isPanitia ? `<span class="year-pill ${TA.isArchive ? 'is-archive' : ''}">${icon(TA.isArchive ? 'archive' : 'calendar', 14)} <span class="yp-word">${TA.isArchive ? 'Arsip' : 'TA'}</span> ${esc(DB.viewYear)}</span>` : ''}
           <span class="role-pill">${icon(App.isPanitia ? 'shield' : 'user', 14)} ${esc(App.isPanitia ? u.label : 'Pelajar')}</span>
           <button class="icon-btn notif-btn" data-action="notif" aria-label="Notifikasi">${icon('bell')}<i class="dot ${unreadCount() ? '' : 'hidden'}"></i></button>
           <a class="top-avatar" href="#/${App.isPanitia ? 'pengaturan' : 'profil'}" aria-label="Profil">${avatar(u.name, 'sm')}</a>
         </div>
         <div class="notif-panel" id="notif-panel"></div>
       </header>
+      <div id="archive-slot"></div>
       <main class="content" id="content"></main>
     </div>
     <nav class="bottom-nav" aria-label="Navigasi bawah">${bottom}<button class="bn-item" data-action="open-sidebar">${icon('more', 22)}<span>Menu</span></button></nav>
@@ -210,7 +214,7 @@ function render(keepScroll) {
   Cleanup.run();
   closeModal(true);
   if (!App.user) { $('#app').innerHTML = LoginPage.render(); LoginPage.mount(); document.title = 'Masuk · LMS BAT'; return; }
-  processLeaveExpiry();   // izin yang tidak ditindak sampai sesi selesai → kedaluwarsa (Tidak hadir)
+  if (!TA.isArchive) processLeaveExpiry();   // izin yang tidak ditindak sampai sesi selesai → kedaluwarsa (Tidak hadir)
   if (!$('.shell')) buildShell();
   const hash = location.hash.replace(/^#\/?/, '');
   const [page, ...params] = (hash || defaultRoute()).split('/');
@@ -228,6 +232,9 @@ function render(keepScroll) {
   $('#page-title').textContent = title;
   document.title = `${title} · LMS BAT`;
   if (p.mount) p.mount(fresh, ...params);
+  lockArchive(fresh);   // arsip: kolom isian dikunci
+  $('.shell').classList.toggle('is-archive', TA.isArchive);
+  $('#archive-slot').innerHTML = TA.isArchive ? archiveBar() : '';
   const navPage = p.navAs || page;
   $$('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === navPage));
   const navDef = navItems().find(n => n.id === navPage);

@@ -161,7 +161,7 @@ const Room = {
       ${notYet.length ? `<details style="margin-top:12px"><summary class="small" style="cursor:pointer;color:var(--primary);font-weight:700">Belum presensi (${notYet.length})${manage ? ' · tandai manual' : ''}</summary>
         <div class="list" style="margin-top:8px">${notYet.map(r => `<div class="item">${avatar(r.st.name, 'xs')}<div class="item-body"><div class="item-title">${esc(r.st.name)}</div></div>${manage ? `<button class="btn btn-sm btn-ghost" data-manual="${r.st.id}">Tandai hadir</button>` : ''}</div>`).join('')}</div></details>` : ''}`;
   },
-  personRow: r => `<div class="item">${avatar(r.st.name, 'sm')}<div class="item-body"><div class="item-title">${esc(r.st.name)}</div><div class="item-sub">${r.time ? r.time + ' WIB' : '—'}${r.via ? ' · ' + esc(r.via) : ''}</div></div>${r.status ? badge(ATT[r.status].label, ATT[r.status].tone) : badge('Belum', 'neutral')}</div>`,
+  personRow: r => `<div class="item">${avatar(r.st.name, 'sm')}<div class="item-body"><div class="item-title">${esc(r.st.name)}</div><div class="item-sub">${r.time ? r.time + ' WIB' : '—'}${r.via ? ' · ' + esc(r.via) : ''}</div></div>${attMark(r.status)}</div>`,
   recapTable(s, roster) {
     const t = this.tally(roster), canEdit = this.canEdit(s);
     return `<div class="card">
@@ -169,7 +169,7 @@ const Room = {
       <div class="row wrap" style="gap:8px;margin-bottom:12px">${badge(`${t.hadir} hadir`, 'success')}${badge(`${t.terlambat} terlambat`, 'warning')}${badge(`${t.izin} izin`, 'info')}${badge(`${t.alpa} tidak hadir`, 'danger')}${t.belum ? badge(`${t.belum} belum`, 'neutral') : ''}</div>
       ${canEdit ? `<div class="note primary" style="margin:0 0 12px">${icon('edit', 15)}<span>Kamu dapat mengedit status presensi pelajar. Setiap perubahan wajib beralasan, tercatat di audit trail, dan terlihat oleh pelajar.</span></div>` : ''}
       <div class="table-wrap"><table><thead><tr><th>Pelajar</th><th>Status</th><th>Waktu</th><th>Keterangan</th><th>Poin</th>${canEdit ? '<th></th>' : ''}</tr></thead><tbody>
-        ${roster.map(r => `<tr><td><div class="cell-user">${avatar(r.st.name, 'sm')}<div><b>${esc(r.st.name)}</b></div></div></td><td>${r.status ? badge(ATT[r.status].label, ATT[r.status].tone) : badge('Belum', 'neutral')}</td><td>${r.time ? r.time + ' WIB' : '—'}</td><td class="muted small">${esc(r.via || '—')}${r.edited ? `<div>Alasan: ${esc(r.edited.note)}</div>` : ''}</td><td><b>${r.status ? fmtPoint(r.status) : '—'}</b></td>${canEdit ? `<td style="text-align:right"><button class="btn btn-sm btn-ghost" data-edit-att="${r.st.id}" aria-label="Edit presensi ${esc(r.st.name)}">${icon('edit', 14)} Edit</button></td>` : ''}</tr>`).join('') || `<tr><td colspan="${canEdit ? 6 : 5}">${emptyState('users', 'Belum ada anggota')}</td></tr>`}
+        ${roster.map(r => `<tr><td><div class="cell-user">${avatar(r.st.name, 'sm')}<div><b>${esc(r.st.name)}</b></div></div></td><td>${attMark(r.status)}</td><td>${r.time ? r.time + ' WIB' : '—'}</td><td class="muted small">${esc(r.via || '—')}${r.edited ? `<div>Alasan: ${esc(r.edited.note)}</div>` : ''}</td><td><b>${r.status ? fmtPoint(r.status) : '—'}</b></td>${canEdit ? `<td style="text-align:right"><button class="btn btn-sm btn-ghost" data-edit-att="${r.st.id}" aria-label="Edit presensi ${esc(r.st.name)}">${icon('edit', 14)} Edit</button></td>` : ''}</tr>`).join('') || `<tr><td colspan="${canEdit ? 6 : 5}">${emptyState('users', 'Belum ada anggota')}</td></tr>`}
       </tbody></table></div>
       <p class="muted small" style="margin-top:10px">Poin presensi (hanya untuk panitia): Hadir 1 · Terlambat 0,5 · Tidak hadir 0 · Izin tidak dihitung.</p>
     </div>`;
@@ -184,7 +184,7 @@ const Room = {
       main = `<div class="scan-success"><div class="success-ic t-${m.tone}">${icon(mine.status === 'alpa' ? 'xCircle' : mine.status === 'izin' ? 'clipboard' : 'check', 36)}</div>
         <h3>${mine.status === 'izin' ? 'Izin disetujui' : mine.status === 'alpa' ? 'Tidak hadir' : 'Presensi tercatat!'}</h3>
         ${mine.status === 'izin' ? '<p class="muted">Pengajuan izinmu untuk pertemuan ini sudah disetujui, jadi kehadiranmu otomatis tercatat Izin.</p>' : ''}
-        <div class="kv-inline"><div><span>Waktu</span><b>${mine.time ? mine.time + ' WIB' : '—'}</b></div><div><span>Status</span>${badge(m.label, m.tone)}</div></div>
+        <div class="kv-inline"><div><span>Waktu</span><b>${mine.time ? mine.time + ' WIB' : '—'}</b></div><div><span>Status</span>${attMark(mine.status)}</div></div>
         ${mine.via && mine.status !== 'izin' ? `<p class="muted small">${esc(mine.via)}</p>` : ''}
         ${mine.edited ? `<p class="muted small">Alasan: ${esc(mine.edited.note)}</p>` : ''}
         ${['alpa', 'terlambat'].includes(mine.status) ? `<p class="muted small">Ada kesalahan pencatatan? <button class="link" style="color:var(--primary);font-weight:700" data-correct="${s.id}">Ajukan koreksi</button></p>` : ''}</div>`;
@@ -318,7 +318,7 @@ const Room = {
     const st = Q.student(studentId), cur = this.roster(s).find(r => r.st.id === studentId);
     openModal({
       title: 'Edit presensi', sub: `${esc(st.name)} · ${esc(this.label(s))}`,
-      body: `<div class="kv"><div><span>Status saat ini</span><b>${cur.status ? badge(ATT[cur.status].label, ATT[cur.status].tone) : badge('Belum', 'neutral')}</b></div></div>
+      body: `<div class="kv"><div><span>Status saat ini</span>${attMark(cur.status)}</div></div>
         <label class="field"><span>Status baru</span><select id="ea-status">${['hadir', 'terlambat', 'izin', 'alpa'].map(k => `<option value="${k}" ${cur.status === k ? 'selected' : ''}>${ATT[k].label}</option>`).join('')}</select></label>
         <label class="field"><span>Alasan perubahan (wajib)</span><textarea id="ea-note" placeholder="cth. Pelajar hadir tetapi GPS bermasalah, dikonfirmasi tutor…" style="min-height:80px"></textarea><small class="field-err"></small></label>
         <div class="note primary">${icon('shield', 15)}<span>Perubahan tercatat di audit trail (siapa, kapan, alasan) dan terlihat oleh pelajar.</span></div>`,
