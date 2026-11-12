@@ -1078,3 +1078,6 @@ td:last-child, th:last-child { padding-right: 2px; }
 .year-pill.is-archive { display: inline-flex; background: var(--graphite); border-color: var(--graphite); color: #fff; }
 @media (min-width: 640px) { .year-pill { display: inline-flex; } }
 @media (max-width: 480px) { .year-pill .yp-word { display: none; } .year-pill.is-archive { padding: 0 9px; font-size: 12px; } }
+
+/* Logo resmi: sudut membulat mengikuti kartu, tidak menyusut di baris flex */
+.logo { display: block; flex: none; border-radius: var(--radius); object-fit: cover; }

@@ -64,12 +64,8 @@ const ICONS = {
 };
 const icon = (n, s = 18) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
 
-/* Tanda sementara: bohlam putih di atas biru keabu-abuan. Ganti dengan berkas logo resmi BAT bila sudah tersedia. */
-const LOGO = (s = 38) => `<svg width="${s}" height="${s}" viewBox="0 0 48 48" role="img" aria-label="Logo BAT">
-  <rect width="48" height="48" rx="9" fill="#6485a3"/>
-  <path fill="#fff" d="M24 9.5a10.5 10.5 0 0 0-6.4 18.8c1.3 1 2.1 2.4 2.1 4v.9h8.6v-.9c0-1.6.8-3 2.1-4A10.5 10.5 0 0 0 24 9.5z"/>
-  <rect x="19.7" y="35.2" width="8.6" height="2.4" rx="1.2" fill="#fff"/><rect x="21.4" y="39" width="5.2" height="2.2" rx="1.1" fill="#fff"/>
-</svg>`;
+/* Logo resmi BAT (img/logo-bat.png): bohlam putih berhati di atas biru tua */
+const LOGO = (s = 38) => `<img class="logo" src="img/logo-bat.png" width="${s}" height="${s}" alt="Logo BAT">`;
 
 /* ---------- Util ---------- */
 const $ = (s, r = document) => r.querySelector(s);
